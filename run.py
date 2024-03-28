@@ -5,9 +5,17 @@ import requests
 from dotenv import load_dotenv, dotenv_values
 
 
-
+#ENVIRONMENT VARIABLES
 load_dotenv()
 
+env_var = dotenv_values(".env")
+userID = env_var.get("USER_ID")
+ulcaApiKey = env_var.get("ULCA_API_KEY")
+pipelineId = env_var.get("PIPELINE_ID")
+computeAuthKey = env_var.get("COMPUTE_AUTHORIZATION_KEY")
+computeAuthValue = env_var.get("COMPUTE_AUTHORIZATION_VALUE")
+
+#FLASK 
 app = Flask(__name__)
 
 @app.route('/')#https://localhost:5000
@@ -15,13 +23,56 @@ def home():
     # return jsonify({})
     pass
 
-def process_asr(audioContent,srcLang,serviceID):
-    pass
+def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
+    pipelineTasks = [
+        {
+            "taskType": "asr",
+            "config": {
+                "language": {
+                    "sourceLanguage": srcLang
+                },
+                "serviceId": asrServiceId,
+                "audioFormat": "flac",
+                "samplingRate": 16000
+            }
+        },
+        {
+            "taskType": "translation",
+            "config": {
+                "language": {
+                    "sourceLanguage": srcLang,
+                    "targetLanguage": tgtLang
+                },
+                "serviceId": nmtServiceId
+            }
+        }
+    ]
+    
+    inputData = {
+        "audio": [
+            {
+                "audioContent": audioContent
+            }
+        ]
+    }
 
-def process_nmt(textContent,srcLang,tgtLang,serviceID):
-    pass
+    reqPayload = {
+        "pipelineTasks": pipelineTasks,
+        "inputData": inputData
+    }
 
-def process_tts():
+    headers = {
+        computeAuthKey:computeAuthValue
+    }
+
+    responseAsrNmt = requests.post(ASR_NMT_ENDPOINT,json=reqPayload,headers=headers)
+
+    return responseAsrNmt.json()
+
+
+
+
+def process_nmt_tts():
     pass
 
 def process_ocr():
@@ -35,12 +86,7 @@ def process_request():
             data = request.json
             srcLang = data["sourceLanguage"]
             tgtLang = data["targetLanguage"]
-
-            #load the environment variables
-            env_var = dotenv_values(".env")
-            userID = env_var.get("USER_ID")
-            ulcaApiKey = env_var.get("ULCA_API_KEY")
-            pipelineId = env_var.get("PIPELINE_ID")
+            audioContent = data["audioContent"]
 
         headers={
             "userID":userID,
@@ -87,14 +133,24 @@ def process_request():
 
         responseServices = requests.post(GET_SERVICE_ENDPOINT,json=langPayload,headers=headers)
 
-        #task based service extraction
+        
 
     except Exception as e:
         return {"error":str(e)},500
         
     finally:
-        return responseServices.json()
+        
+        asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
+        nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
+
+        # tempresp = {"asr": asrServiceId,"nmt":nmtServiceId,"audio":audioContent}
+        # return tempresp
+    
+        return process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
+        
 
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
+
+
 if __name__ == "__main__":
     app.run(debug=True)
