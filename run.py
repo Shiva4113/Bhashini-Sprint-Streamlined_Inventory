@@ -24,56 +24,106 @@ def home():
     pass
 
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
-    pipelineTasks = [
-        {
-            "taskType": "asr",
-            "config": {
-                "language": {
-                    "sourceLanguage": srcLang
-                },
-                "serviceId": asrServiceId,
-                "audioFormat": "flac",
-                "samplingRate": 16000
-            }
-        },
-        {
-            "taskType": "translation",
-            "config": {
-                "language": {
-                    "sourceLanguage": srcLang,
-                    "targetLanguage": tgtLang
-                },
-                "serviceId": nmtServiceId
-            }
-        }
-    ]
-    
-    inputData = {
-        "audio": [
+    try:
+        pipelineTasks = [
             {
-                "audioContent": audioContent
+                "taskType": "asr",
+                "config": {
+                    "language": {
+                        "sourceLanguage": srcLang
+                    },
+                    "serviceId": asrServiceId,
+                    "audioFormat": "flac",
+                    "samplingRate": 16000
+                }
+            },
+            {
+                "taskType": "translation",
+                "config": {
+                    "language": {
+                        "sourceLanguage": srcLang,
+                        "targetLanguage": tgtLang
+                    },
+                    "serviceId": nmtServiceId
+                }
             }
         ]
-    }
+        
+        inputData = {
+            "audio": [
+                {
+                    "audioContent": audioContent
+                }
+            ]
+        }
 
-    reqPayload = {
-        "pipelineTasks": pipelineTasks,
-        "inputData": inputData
-    }
+        reqPayload = {
+            "pipelineTasks": pipelineTasks,
+            "inputData": inputData
+        }
 
-    headers = {
-        computeAuthKey:computeAuthValue
-    }
+        headers = {
+            computeAuthKey:computeAuthValue
+        }
 
-    responseAsrNmt = requests.post(ASR_NMT_ENDPOINT,json=reqPayload,headers=headers)
+        responseAsrNmt = requests.post(ASR_NMT_ENDPOINT,json=reqPayload,headers=headers)
 
-    return responseAsrNmt.json()
+    
+    except Exception as e:
+        return {"error":str(e)},500
+    
+    finally:
+        return responseAsrNmt.json()
+        
 
+def process_nmt_tts(sampleInput,srcLang,tgtLang,ttsServiceId,nmtServiceId):
+    try:
+        pipelineTasks = [
+            {
+                "taskType": "translation",
+                "config": {
+                    "language": {
+                        "sourceLanguage": srcLang,
+                        "targetLanguage": tgtLang
+                    },
+                    "serviceId": nmtServiceId
+                }
+            },
+            {
+                "taskType": "tts",
+                "config": {
+                    "language": {
+                        "sourceLanguage": tgtLang
+                    },
+                    "serviceId": ttsServiceId,
+                    "gender": "female",
+                    "samplingRate": 8000
+                }
+            }
+        ]
+        
+        inputData = {
+            "input": [
+                {
+                    "source": sampleInput
+                }
+            ]
+        }
+        
+        reqPayload = {
+            "pipelineTasks": pipelineTasks,
+            "inputData": inputData
+        }
 
+        headers = {
+            computeAuthKey:computeAuthValue
+        }
 
-
-def process_nmt_tts():
-    pass
+        responseNmtTts = requests.post(NMT_TTS_ENDPOINT,json=reqPayload,headers=headers)
+    except Exception as e:
+        return {"error":str(e)},500
+    finally:
+        return responseNmtTts.json()
 
 def process_ocr():
     pass
@@ -142,12 +192,12 @@ def process_request():
         
         asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
         nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
-
+        ttsserviceID = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
         # tempresp = {"asr": asrServiceId,"nmt":nmtServiceId,"audio":audioContent}
         # return tempresp
     
-        return process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
-        
+        #return process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
+        return process_nmt_tts(sampleInput="Hello",srcLang=srcLang,tgtLang=tgtLang,ttsServiceId=ttsserviceID,nmtServiceId=nmtServiceId)
 
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
