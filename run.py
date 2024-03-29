@@ -8,6 +8,7 @@ import textwrap
 import google.generativeai as genai
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from bson.objectid import ObjectId
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -72,25 +73,59 @@ def home():
     # return jsonify({})
     pass
 
+#HANDLE DATABASE
 def process_db():
     pass
 
-def process_instr(instruction):
+#HANDLE LLM - GEMINI
+def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     '''
     Here I will work on the database -> CRUD
     '''
-    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal. Let your answer be exactly 3 words: [INSERT/REMOVE] [quantity as a number] [item name in singular]")
+    if not isinstance(userId, ObjectId):
+        userId = ObjectId(userId)
+    
+    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal.Let your answer be exactly 3 words: [INSERT/REMOVE] [item_qty as a number] [item name in singular].In case of status query of any item give your response in exactly 2 words with the format : [STATUS] [item in singular]")
     
     cmdContent = responseGen.text.upper().split()
 
     dbOperation = cmdContent[0]
+    if dbOperation == "STATUS":
+        itemName = cmdContent[1]
+        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        if responseDB:
+            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+            if item:
+                if item['item_qty'] > item['item_min']:
+                    return f"{item['item_qty']} of {itemName} is available"
+                elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
+                    return f"{item['item_qty']} of {itemName} is available. low on stock"
+                else:
+                    return f"{itemName} is out of stock"
+            else:
+                return f"{itemName} is not available"
+        else:
+            return f"{itemName} is not available"
 
-    
+    elif dbOperation == "INSERT":
+        itemQty = int(cmdContent[1])
+        itemName = cmdContent[2]
+        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        if responseDB:
+            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+            if item:
+                dbInv.update_one({"user_id": userId, "items.item_name": itemName}, {"$inc": {"items.$.item_qty": itemQty}})
+                return f"{itemQty} {itemName} added to inventory"
+            else:
+                dbInv.update_one({"user_id": userId}, {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min": 10}}})
+                return f"{itemQty} {itemName} added to inventory"
+        else:
+            dbInv.insert_one({"user_id": userId, "items": [{"item_name": itemName, "item_qty": itemQty, "item_min": 10}]})
+            return f"{itemQty} {itemName} added to inventory"
 
-    return {"cmd":cmdContent}
+    return {"cmd": cmdContent}
 
-
-
+#HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
     try:
         pipelineTasks = [
@@ -143,7 +178,6 @@ def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
     finally:
         return responseAsrNmt.json()
         
-
 def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     try:
         pipelineTasks = [
@@ -193,7 +227,7 @@ def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     finally:
         return responseNmtTts.json()
 
-def process_ocr():#optical character recognition
+def process_ocr():
     pass
 
 @app.route('/process',methods = ["POST"])#https://localhost:5000/process
@@ -202,9 +236,10 @@ def process_request():
     try:
         if request.method == "POST":
             data = request.json
-            srcLang = data["sourceLanguage"]
-            tgtLang = data["targetLanguage"]
-            audioContent = data["audioContent"]
+            srcLang = data.get("sourceLanguage", "")
+            tgtLang = data.get("targetLanguage", "")
+            audioContent = data.get("audioContent", "")
+            imageUri = data.get("imageUri", "")
 
         headers={
             "userID":userID,
@@ -261,7 +296,8 @@ def process_request():
         asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
         nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
         ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
-    
+        ocrServiceId = "bhashini-anuvaad-tesseract-ocr-printed-line-all"#this is the only given ocr service ID
+
         responseAsrNmt = process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
 
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
@@ -275,6 +311,17 @@ def process_request():
         
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
+
+
+
+#HANDLE LOGIN SIGNUP
+@app.route('/login',methods=["POST"])
+def login():
+    pass
+
+@app.route('/signup',methods=["POST"])
+def signup():
+    pass
 
 
 if __name__ == "__main__":
