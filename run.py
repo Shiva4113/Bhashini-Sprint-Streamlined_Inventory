@@ -91,11 +91,7 @@ def home():
     # return jsonify({})
     pass
 
-#HANDLE DATABASE
-def process_db():
-    pass
-
-#HANDLE LLM - GEMINI
+#HANDLE DB with LLM - GEMINI
 def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     '''
     Here I will work on the database -> CRUD
@@ -108,40 +104,33 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     cmdContent = responseGen.text.upper().split()
 
     dbOperation = cmdContent[0]
-    if dbOperation == "STATUS":
-        itemName = cmdContent[1]
-        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
-        if responseDB:
-            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
-            if item:
-                if item['item_qty'] > item['item_min']:
-                    return f"{item['item_qty']} of {itemName} is available"
-                elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
-                    return f"{item['item_qty']} of {itemName} is available. low on stock"
-                else:
-                    return f"{itemName} is out of stock"
-            else:
-                return f"{itemName} is not available"
-        else:
-            return f"{itemName} is not available"
 
-    elif dbOperation == "INSERT":
+    if dbOperation == "INSERT":
         itemQty = int(cmdContent[1])
-        itemName = cmdContent[2]
-        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
-        if responseDB:
-            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
-            if item:
-                dbInv.update_one({"user_id": userId, "items.item_name": itemName}, {"$inc": {"items.$.item_qty": itemQty}})
-                return f"{itemQty} {itemName} added to inventory"
-            else:
-                dbInv.update_one({"user_id": userId}, {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min": 10}}})
-                return f"{itemQty} {itemName} added to inventory"
-        else:
-            dbInv.insert_one({"user_id": userId, "items": [{"item_name": itemName, "item_qty": itemQty, "item_min": 10}]})
-            return f"{itemQty} {itemName} added to inventory"
+        itemName = cmdContent[2].capitalize()
+        responseDB = dbInv.find_one({"user_id": userId})
 
-    return {"cmd": cmdContent}
+        if responseDB:
+            if itemName in responseDB['items']:
+                for item in responseDB['items']:
+                    if item['item_name'] == itemName:
+                        #check for thresholds
+                        #insert price, min and max
+                        #after this update similarly in the stats collection -> dbStats
+                        item['item_qty'] += itemQty
+            else:
+                responseDB['items'].append({'name': itemName, 'quantity': itemQty})
+            dbInv.update_one({"_id": responseDB['_id']}, {"$set": responseDB})
+            return {"resp": f"{itemQty} {itemName} inserted successfully"}
+        else:
+            return jsonify({"resp": "User not found"}),401
+    elif dbOperation == "REMOVE":
+        pass
+
+    elif dbOperation == "STATUS":
+        pass
+    # return {"cmd": cmdContent}
+    
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
