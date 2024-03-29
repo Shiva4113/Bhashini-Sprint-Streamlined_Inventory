@@ -5,6 +5,7 @@ import requests
 from dotenv import load_dotenv, dotenv_values
 import google.generativeai as genai
 from pymongo import MongoClient
+from bson.objectid import ObjectId
 from pymongo.errors import ConnectionFailure
 from bcrypt import gensalt,hashpw,checkpw
 
@@ -95,19 +96,52 @@ def process_db():
     pass
 
 #HANDLE LLM - GEMINI
-def process_instr(instruction):
+def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     '''
     Here I will work on the database -> CRUD
     '''
-    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal. Let your answer be exactly 3 words: [INSERT/REMOVE] [quantity as a number] [item name in singular]")
+    if not isinstance(userId, ObjectId):
+        userId = ObjectId(userId)
+    
+    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal.Let your answer be exactly 3 words: [INSERT/REMOVE] [item_qty as a number] [item name in singular].In case of status query of any item give your response in exactly 2 words with the format : [STATUS] [item in singular]")
     
     cmdContent = responseGen.text.upper().split()
 
     dbOperation = cmdContent[0]
+    if dbOperation == "STATUS":
+        itemName = cmdContent[1]
+        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        if responseDB:
+            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+            if item:
+                if item['item_qty'] > item['item_min']:
+                    return f"{item['item_qty']} of {itemName} is available"
+                elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
+                    return f"{item['item_qty']} of {itemName} is available. low on stock"
+                else:
+                    return f"{itemName} is out of stock"
+            else:
+                return f"{itemName} is not available"
+        else:
+            return f"{itemName} is not available"
 
+    elif dbOperation == "INSERT":
+        itemQty = int(cmdContent[1])
+        itemName = cmdContent[2]
+        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        if responseDB:
+            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+            if item:
+                dbInv.update_one({"user_id": userId, "items.item_name": itemName}, {"$inc": {"items.$.item_qty": itemQty}})
+                return f"{itemQty} {itemName} added to inventory"
+            else:
+                dbInv.update_one({"user_id": userId}, {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min": 10}}})
+                return f"{itemQty} {itemName} added to inventory"
+        else:
+            dbInv.insert_one({"user_id": userId, "items": [{"item_name": itemName, "item_qty": itemQty, "item_min": 10}]})
+            return f"{itemQty} {itemName} added to inventory"
 
-
-    return {"cmd":cmdContent}
+    return {"cmd": cmdContent}
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
