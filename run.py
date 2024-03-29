@@ -245,8 +245,42 @@ def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     finally:
         return responseNmtTts.json()
 
-def process_ocr():
-    pass
+def process_ocr(srcLang,imgUri,ocrServiceId):
+    try:
+        pipelineTasks = [
+            {
+                "taskType": "ocr",
+                "config": {
+                    "language": {
+                        "sourceLanguage": srcLang
+                    },
+                    "serviceId": ocrServiceId
+                }
+            }
+        ]
+        
+        inputData = {
+            "image": [
+                {
+                "imageUri": imgUri
+                }
+            ]
+        }
+        reqPayload = {
+            "pipelineTasks": pipelineTasks,
+            "inputData": inputData
+        }
+
+        headers = {
+            computeAuthKey:computeAuthValue
+        }
+        
+        responseOcr = requests.post(ASR_NMT_TTS_ENDPOINT,json=reqPayload,headers=headers)
+        
+    except Exception as e:
+        return {"error":str(e)},500
+    finally:
+        return responseOcr.json()
 
 @app.route('/process',methods = ["POST"])#https://localhost:5000/process
 def process_request():
@@ -322,11 +356,11 @@ def process_request():
         
         
         return process_instr(instruction=getCmd)
-        # responseDB = process_instr(instruction=genCmd)
-
+        responseDB = process_instr(instruction=genCmd)
         responseNmtTts = process_nmt_tts(textContent = "Sold ten Bananas.",srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
         # return {"op":responseNmtTts}
-        
+        responseocr = process_ocr(srcLang=srcLang,imgUri="https://dhruvacentrali0960249713.blob.core.windows.net/haridas/Hindi-Bhasha.jpg",ocrServiceId=ocrServiceId)
+        #return {"op":responseocr}
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
@@ -339,7 +373,6 @@ def signup():
         pwd = credentials["password"]
         salt = gensalt()
         hashedPwd = hashpw(pwd.encode('utf-8'),salt)
-        #here i should encrypt the pwd
         email = credentials["email"]
         language = credentials["language"]
         mobileNo = credentials["mobile_no"]
