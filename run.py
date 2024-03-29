@@ -3,11 +3,10 @@ from flask import Flask,request,jsonify
 from endpoints import *
 import requests
 from dotenv import load_dotenv, dotenv_values
-import pathlib
-import textwrap
 import google.generativeai as genai
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from bcrypt import gensalt,hashpw,checkpw
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -21,48 +20,67 @@ computeAuthValue = env_var.get("COMPUTE_AUTHORIZATION_VALUE")
 mongoURI = env_var.get("MONGODB_URI")
 geminiApiKey = env_var.get("GEMINI_API_KEY")
 
+#GLOBAL VARIABLES
+client = None
+dbDetails = None
+dbUserAuth = None
+dbInv = None
+dbStats = None
+generation_config = None
+safety_settings = None
+model = None
+
 #GEMINI CONFIGURATION
-genai.configure(api_key=geminiApiKey)
+def setGemini():
+    global generation_config,safety_settings,model
 
-generation_config = {
-  "temperature": 0.9,
-  "top_p": 1,
-  "top_k": 1,
-  "max_output_tokens": 2048,
-}
+    genai.configure(api_key=geminiApiKey)
 
-safety_settings = [
-  {
-    "category": "HARM_CATEGORY_HARASSMENT",
-    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-  },
-  {
-    "category": "HARM_CATEGORY_HATE_SPEECH",
-    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-  },
-  {
-    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-  },
-  {
-    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-  },
-]
+    generation_config = {
+    "temperature": 0.9,
+    "top_p": 1,
+    "top_k": 1,
+    "max_output_tokens": 2048,
+    }
 
-model = genai.GenerativeModel(model_name="gemini-1.0-pro",
-                              generation_config=generation_config,
-                              safety_settings=safety_settings)
+    safety_settings = [
+    {
+        "category": "HARM_CATEGORY_HARASSMENT",
+        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+    },
+    {
+        "category": "HARM_CATEGORY_HATE_SPEECH",
+        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+    },
+    {
+        "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+    },
+    {
+        "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+        "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+    },
+    ]
+
+    model = genai.GenerativeModel(model_name="gemini-1.0-pro",
+                                generation_config=generation_config,
+                                safety_settings=safety_settings)
+
+setGemini()
 
 #MONGODB SETUP
-try:
-    client = MongoClient(mongoURI)
-    dbDetails = client.details
-    dbUserAuth = dbDetails.userAuth
-    dbInv = dbDetails.inventory
-    dbStats = dbDetails.stats
-except ConnectionFailure as e:
-    print({"Connnection Error": e})
+def dbConnect():
+    global client,dbDetails,dbInv,dbStats,dbUserAuth
+    try:
+        client = MongoClient(mongoURI)
+        dbDetails = client.details
+        dbUserAuth = dbDetails.userAuth
+        dbInv = dbDetails.inventory
+        dbStats = dbDetails.stats
+    except ConnectionFailure as e:
+        print({"Connnection Error": e})
+
+dbConnect()
 
 #FLASK
 app = Flask(__name__)
@@ -72,9 +90,11 @@ def home():
     # return jsonify({})
     pass
 
+#HANDLE DATABASE
 def process_db():
     pass
 
+#HANDLE LLM - GEMINI
 def process_instr(instruction):
     '''
     Here I will work on the database -> CRUD
@@ -85,12 +105,11 @@ def process_instr(instruction):
 
     dbOperation = cmdContent[0]
 
-    
+
 
     return {"cmd":cmdContent}
 
-
-
+#HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
     try:
         pipelineTasks = [
@@ -143,7 +162,6 @@ def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
     finally:
         return responseAsrNmt.json()
         
-
 def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     try:
         pipelineTasks = [
@@ -193,7 +211,7 @@ def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     finally:
         return responseNmtTts.json()
 
-def process_ocr():#optical character recognition
+def process_ocr():
     pass
 
 @app.route('/process',methods = ["POST"])#https://localhost:5000/process
@@ -202,9 +220,10 @@ def process_request():
     try:
         if request.method == "POST":
             data = request.json
-            srcLang = data["sourceLanguage"]
-            tgtLang = data["targetLanguage"]
-            audioContent = data["audioContent"]
+            srcLang = data.get("sourceLanguage", "")
+            tgtLang = data.get("targetLanguage", "")
+            audioContent = data.get("audioContent", "")
+            imageUri = data.get("imageUri", "")
 
         headers={
             "userID":userID,
@@ -261,7 +280,8 @@ def process_request():
         asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
         nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
         ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
-    
+        ocrServiceId = "bhashini-anuvaad-tesseract-ocr-printed-line-all"#this is the only given ocr service ID
+
         responseAsrNmt = process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
 
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
@@ -276,6 +296,56 @@ def process_request():
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
+#HANDLE LOGIN SIGNUP
+@app.route('/signup',methods=["POST"])
+def signup():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        pwd = credentials["password"]
+        salt = gensalt()
+        hashedPwd = hashpw(pwd.encode('utf-8'),salt)
+        #here i should encrypt the pwd
+        email = credentials["email"]
+        language = credentials["language"]
+        mobileNo = credentials["mobile_no"]
+    authCreds = {"username":username,"password":hashedPwd,"email":email,"language":language,"mobile_no":mobileNo}
 
+    existing_user = dbUserAuth.find_one({"$or": [{"username": username}, {"email": email}, {"mobile_no": mobileNo}]})
+    if existing_user:
+            return jsonify({"error": "Username, email, or mobile number already exists"}), 400
+
+    result = dbUserAuth.insert_one(authCreds)
+    user_id = result.inserted_id
+
+    invCreds = {"items":[],"user_id":user_id}
+    statCreds = {"statistics":{},"user_id":user_id}
+
+    dbInv.insert_one(invCreds)
+    dbStats.insert_one(statCreds)
+
+    return jsonify({"message": "User created successfully"}), 201
+
+
+
+@app.route('/login',methods=["POST"])
+def login():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        pwd = credentials["password"]
+
+        user = dbUserAuth.find_one({"username": username})
+        if user:
+            userPwd = user["password"]
+            if checkpw(pwd.encode('utf-8'),userPwd):
+                return jsonify({"message": "Login successful"}), 200
+            else:
+                return jsonify({"error": "Incorrect password"}), 401
+        else:
+            return jsonify({"error": "User not found"}), 404
+    
+    #can globally set the db to its documents
+    
 if __name__ == "__main__":
     app.run(debug=True)
