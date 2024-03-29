@@ -55,15 +55,16 @@ model = genai.GenerativeModel(model_name="gemini-1.0-pro",
                               safety_settings=safety_settings)
 
 #MONGODB SETUP
-'''
 try:
     client = MongoClient(mongoURI)
-    dbStores = client.stores
-    storeDetails = dbStores.details
+    dbDetails = client.details
+    dbUserAuth = dbDetails.userAuth
+    dbInv = dbDetails.inventory
+    dbStats = dbDetails.stats
 except ConnectionFailure as e:
     print({"Connnection Error": e})
-'''
-#FLASK 
+
+#FLASK
 app = Flask(__name__)
 
 @app.route('/')#https://localhost:5000
@@ -71,14 +72,24 @@ def home():
     # return jsonify({})
     pass
 
+def process_db():
+    pass
+
 def process_instr(instruction):
     '''
     Here I will work on the database -> CRUD
     '''
-    genContent = model.generate_content(f"{instruction}. Give me the CRUD operation corresponding to this instruction.")
+    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal. Let your answer be exactly 3 words: [INSERT/REMOVE] [quantity as a number] [item name in singular]")
     
-    return {"content":genContent}
-    pass
+    cmdContent = responseGen.text.upper().split()
+
+    dbOperation = cmdContent[0]
+
+    
+
+    return {"cmd":cmdContent}
+
+
 
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
     try:
@@ -133,7 +144,7 @@ def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
         return responseAsrNmt.json()
         
 
-def process_nmt_tts(sampleInput,srcLang,tgtLang,ttsServiceId,nmtServiceId):
+def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     try:
         pipelineTasks = [
             {
@@ -150,7 +161,7 @@ def process_nmt_tts(sampleInput,srcLang,tgtLang,ttsServiceId,nmtServiceId):
                 "taskType": "tts",
                 "config": {
                     "language": {
-                        "sourceLanguage": tgtLang
+                        "sourceLanguage": srcLang
                     },
                     "serviceId": ttsServiceId,
                     "gender": "female",
@@ -162,7 +173,7 @@ def process_nmt_tts(sampleInput,srcLang,tgtLang,ttsServiceId,nmtServiceId):
         inputData = {
             "input": [
                 {
-                    "source": sampleInput
+                    "source": textContent
                 }
             ]
         }
@@ -182,7 +193,7 @@ def process_nmt_tts(sampleInput,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     finally:
         return responseNmtTts.json()
 
-def process_ocr():
+def process_ocr():#optical character recognition
     pass
 
 @app.route('/process',methods = ["POST"])#https://localhost:5000/process
@@ -251,16 +262,18 @@ def process_request():
         nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
         ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
     
-        responseAsrNmt=process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
-        responseNmtTts=process_nmt_tts(sampleInput = "hello",srcLang=srcLang,tgtLang=tgtLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
+        responseAsrNmt = process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
 
-        tempresp = {
-            "responseAsrNmt" : responseAsrNmt,
-            "responseNmtTts" : responseNmtTts
-        }
-        return tempresp
+        getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
         
+        
+        return process_instr(instruction=getCmd)
+        # responseDB = process_instr(instruction=genCmd)
 
+        responseNmtTts = process_nmt_tts(textContent = "Sold ten Bananas.",srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
+        # return {"op":responseNmtTts}
+        
+        
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
 
