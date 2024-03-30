@@ -31,7 +31,7 @@ dbStats = None
 generation_config = None
 safety_settings = None
 model = None
-
+logged_in_user = None
 
 #parse json
 def parse_json(data):
@@ -166,7 +166,21 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
         
 
     elif dbOperation == "STATUS":
-        pass
+        itemName = cmdContent[1]
+        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        if responseDB:
+            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+            if item:
+                if item['item_qty'] > item['item_min']:
+                    return {"resp": f"{item['item_qty']} of {itemName} is available"}
+                elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
+                    return {"resp": f"{item['item_qty']} of {itemName} is available. low on stock"}
+                else:
+                    return {"resp": f"{itemName} is out of stock"}
+            else:
+                return {"resp": f"{itemName} is not available"}
+        else:
+            return {"resp": "User not found"}
     # return {"cmd": cmdContent}
 
     return replyToUser
@@ -273,8 +287,42 @@ def process_nmt_tts(textContent,srcLang,tgtLang,ttsServiceId,nmtServiceId):
     finally:
         return responseNmtTts.json()
 
-def process_ocr():
-    pass
+def process_ocr(srcLang,imgUri,ocrServiceId):
+    try:
+        pipelineTasks = [
+            {
+                "taskType": "ocr",
+                "config": {
+                    "language": {
+                        "sourceLanguage": srcLang
+                    },
+                    "serviceId": ocrServiceId
+                }
+            }
+        ]
+        
+        inputData = {
+            "image": [
+                {
+                "imageUri": imgUri
+                }
+            ]
+        }
+        reqPayload = {
+            "pipelineTasks": pipelineTasks,
+            "inputData": inputData
+        }
+
+        headers = {
+            computeAuthKey:computeAuthValue
+        }
+        
+        responseOcr = requests.post(ASR_NMT_TTS_ENDPOINT,json=reqPayload,headers=headers)
+        
+    except Exception as e:
+        return {"error":str(e)},500
+    finally:
+        return responseOcr.json()
 
 @app.route('/process',methods = ["POST"])#https://localhost:5000/process
 def process_request():
@@ -355,8 +403,10 @@ def process_request():
         # responseDB = process_instr(instruction=genCmd)
 
         responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
-        # return {"op":responseNmtTts}
-        return responseNmtTts
+        # return responseNmtTts
+        # return process_instr(instruction=getCmd,userId=ObjectId(logged_in_user))
+        # responseocr = process_ocr(srcLang=srcLang,imgUri="https://dhruvacentrali0960249713.blob.core.windows.net/haridas/Hindi-Bhasha.jpg",ocrServiceId=ocrServiceId)
+        #return {"op":responseocr}
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
@@ -369,7 +419,6 @@ def signup():
         pwd = credentials["password"]
         salt = gensalt()
         hashedPwd = hashpw(pwd.encode('utf-8'),salt)
-        #here i should encrypt the pwd
         email = credentials["email"]
         language = credentials["language"]
         mobileNo = credentials["mobile_no"]
@@ -403,6 +452,7 @@ def login():
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
+                globals(logged_in_user = user["_id"])
                 return jsonify({"message": "Login successful"}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401
@@ -411,5 +461,50 @@ def login():
     
     #can globally set the db to its documents
     
+
+@app.route('/change_password',methods=["POST"])
+def change_password():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        pwd = credentials["password"]
+        newPwd = credentials["new_password"]
+
+        user = dbUserAuth.find_one({"username": username})
+        if user:
+            userPwd = user["password"]
+            if checkpw(pwd.encode('utf-8'),userPwd):
+                salt = gensalt()
+                hashedPwd = hashpw(newPwd.encode('utf-8'),salt)
+                dbUserAuth.update_one({"username": username}, {"$set": {"password": hashedPwd}})
+                return jsonify({"message": "Password changed successfully"}), 200
+            else:
+                return jsonify({"error": "Incorrect password"}), 401
+        else:
+            return jsonify({"error": "User not found"}), 404
+        
+
+@app.route('/change_language',methods=["POST"])
+def change_language():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        language = credentials["language"]
+
+        user = dbUserAuth.find_one({"username": username})
+        if user:
+            dbUserAuth.update_one({"username": username}, {"$set": {"language": language}})
+            return jsonify({"message": "Language changed successfully"}), 200
+        else:
+            return jsonify({"error": "User not found"}), 404
+        
+@app.route('/logout',methods=["POST"])
+def logout():
+    if request.method == "POST":
+        globals(logged_in_user = None)
+        return jsonify({"message": "Logout successful"}), 200
+        
+        
+
 if __name__ == "__main__":
     app.run(debug=True)
