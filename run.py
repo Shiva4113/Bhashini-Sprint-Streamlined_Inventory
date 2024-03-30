@@ -31,7 +31,7 @@ dbStats = None
 generation_config = None
 safety_settings = None
 model = None
-
+logged_in_user = None
 
 #parse json
 def parse_json(data):
@@ -391,7 +391,7 @@ def process_request():
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
         
         
-        return process_instr(instruction=getCmd)
+        return process_instr(instruction=getCmd,userId=ObjectId(logged_in_user))
         responseDB = process_instr(instruction=genCmd)
         responseNmtTts = process_nmt_tts(textContent = "Sold ten Bananas.",srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
         # return {"op":responseNmtTts}
@@ -442,6 +442,7 @@ def login():
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
+                globals(logged_in_user = user["_id"])
                 return jsonify({"message": "Login successful"}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401
@@ -450,5 +451,50 @@ def login():
     
     #can globally set the db to its documents
     
+
+@app.route('/change_password',methods=["POST"])
+def change_password():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        pwd = credentials["password"]
+        newPwd = credentials["new_password"]
+
+        user = dbUserAuth.find_one({"username": username})
+        if user:
+            userPwd = user["password"]
+            if checkpw(pwd.encode('utf-8'),userPwd):
+                salt = gensalt()
+                hashedPwd = hashpw(newPwd.encode('utf-8'),salt)
+                dbUserAuth.update_one({"username": username}, {"$set": {"password": hashedPwd}})
+                return jsonify({"message": "Password changed successfully"}), 200
+            else:
+                return jsonify({"error": "Incorrect password"}), 401
+        else:
+            return jsonify({"error": "User not found"}), 404
+        
+
+@app.route('/change_language',methods=["POST"])
+def change_language():
+    if request.method == "POST":
+        credentials = request.json
+        username = credentials["username"]
+        language = credentials["language"]
+
+        user = dbUserAuth.find_one({"username": username})
+        if user:
+            dbUserAuth.update_one({"username": username}, {"$set": {"language": language}})
+            return jsonify({"message": "Language changed successfully"}), 200
+        else:
+            return jsonify({"error": "User not found"}), 404
+        
+@app.route('/logout',methods=["POST"])
+def logout():
+    if request.method == "POST":
+        globals(logged_in_user = None)
+        return jsonify({"message": "Logout successful"}), 200
+        
+        
+
 if __name__ == "__main__":
     app.run(debug=True)
