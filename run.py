@@ -101,8 +101,10 @@ def home():
 #HANDLE DB with LLM - GEMINI
 def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     '''
+    
     Here I will work on the database -> CRUD
     '''
+    replyToUser = {}
     if not isinstance(userId, ObjectId):
         userId = ObjectId(userId)
     
@@ -125,7 +127,7 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
                             {"$inc": {"items.$.item_qty": itemQty}}
                         )
                         item_exists = True
-                        return {"resp": f"{itemQty} {itemName} added successfully"}
+                        replyToUser = {"response": f"{itemQty} {itemName} added successfully"}
                         
                 
                 if not item_exists:
@@ -133,10 +135,10 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
                         {"_id": responseDB['_id']},
                         {"$push": {"items": {"item_name": itemName, "item_qty": itemQty}}}
                     )
-                    return {"resp": f"{itemQty} {itemName} inserted successfully"}
+                    replyToUser = {"response": f"{itemQty} {itemName} inserted successfully"}
                 
             else:
-                return {"resp": "User not found"}
+                replyToUser = {"response": "User not found"}
 
     elif dbOperation == "REMOVE":
         if responseDB:
@@ -147,23 +149,27 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
                     item_exists = True
                     if item['item_qty'] >= itemQty:
                         # If the item's quantity is greater than or equal to the quantity to be removed, decrement the quantity
+                        # if the item quantity is below threshold, remove but alert with remaining qty -> pertains to restock
                         dbInv.update_one(
                             {"_id": responseDB['_id'], "items.item_name": itemName},
                             {"$inc": {"items.$.item_qty": -itemQty}}
                         )
-                        return {"resp": f"{itemQty} {itemName} removed successfully"}
+                        replyToUser = {"response": f"Sold {itemQty} {itemName} successfully"}
                     else:
-                        return {"resp": f"Not enough {itemName} in inventory"}
+                        replyToUser = {"response": f"{itemName} is currently over"}
             
             if not item_exists:
-                return {"resp": f"{itemName} not found in inventory"}
+                replyToUser = {"response": f"{itemName} was not found"}
         else:
-            return {"resp": "User not found"}
+            replyToUser = {"response": "User not found"}
+
+        
 
     elif dbOperation == "STATUS":
         pass
     # return {"cmd": cmdContent}
-    
+
+    return replyToUser
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
@@ -343,12 +349,14 @@ def process_request():
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
         
         
-        return process_instr(instruction=getCmd)
+        responseLLM= process_instr(instruction=getCmd)
+
+
         # responseDB = process_instr(instruction=genCmd)
 
-        responseNmtTts = process_nmt_tts(textContent = "Sold ten Bananas.",srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
+        responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
         # return {"op":responseNmtTts}
-        
+        return responseNmtTts
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
