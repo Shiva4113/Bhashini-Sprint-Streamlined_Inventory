@@ -167,15 +167,15 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
             item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
             if item:
                 if item['item_qty'] > item['item_min']:
-                    return f"{item['item_qty']} of {itemName} is available"
+                    return {"resp": f"{item['item_qty']} of {itemName} is available"}
                 elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
-                    return f"{item['item_qty']} of {itemName} is available. low on stock"
+                    return {"resp": f"{item['item_qty']} of {itemName} is available. low on stock"}
                 else:
-                    return f"{itemName} is out of stock"
+                    return {"resp": f"{itemName} is out of stock"}
             else:
-                return f"{itemName} is not available"
+                return {"resp": f"{itemName} is not available"}
         else:
-            return f"{itemName} is not available"
+            return {"resp": "User not found"}
     # return {"cmd": cmdContent}
     
 
