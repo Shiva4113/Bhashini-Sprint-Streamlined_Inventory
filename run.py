@@ -9,6 +9,8 @@ from bson import ObjectId, json_util
 from pymongo.errors import ConnectionFailure
 from bcrypt import gensalt,hashpw,checkpw
 import json
+from pathlib import Path
+
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -30,8 +32,8 @@ dbInv = None
 dbStats = None
 generation_config = None
 safety_settings = None
-model = None
-logged_in_user = None
+modelText = None
+modelVision = None
 
 #parse json
 def parse_json(data):
@@ -40,7 +42,7 @@ def parse_json(data):
 
 #GEMINI CONFIGURATION
 def setGemini():
-    global generation_config,safety_settings,model
+    global generation_config,safety_settings,modelText, modelVision
 
     genai.configure(api_key=geminiApiKey)
 
@@ -70,9 +72,14 @@ def setGemini():
     },
     ]
 
-    model = genai.GenerativeModel(model_name="gemini-1.0-pro",
+    modelText = genai.GenerativeModel(model_name="gemini-1.0-pro",
                                 generation_config=generation_config,
                                 safety_settings=safety_settings)
+
+    modelVision = genai.GenerativeModel(model_name="gemini-pro-vision",
+                                generation_config=generation_config,
+                                safety_settings=safety_settings)
+    
 
 setGemini()
 
@@ -93,97 +100,147 @@ dbConnect()
 #FLASK
 app = Flask(__name__)
 
-@app.route('/')#https://localhost:5000
-def home():
-    # return jsonify({})
-    pass
+# @app.route('/')#https://localhost:5000
+# def home():
+   
 
 #HANDLE DB with LLM - GEMINI
-def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
-    '''
-    
-    Here I will work on the database -> CRUD
-    '''
-    replyToUser = {}
+def process_instr(instruction, userId):
+
+    replyToUser = ""
+
     if not isinstance(userId, ObjectId):
         userId = ObjectId(userId)
     
-    responseGen = model.generate_content(f"{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)Tell me whether this instruction is corresponding to updation -> insertion or removal.Let your answer be exactly 3 words: [INSERT/REMOVE] [item_qty as a number] [item name in singular].In case of status query of any item give your response in exactly 2 words with the format : [STATUS] [item in singular]")
-    
-    cmdContent = responseGen.text.upper().split()
+    responseGen = modelText.generate_content(f'''{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)
+    For anything related to selling : REMOVE
+    For anything related to receiving : INSERT
+    For anything that checks for item properties : STATUS
 
+    examples :  2 Onions 3 Bananas sold : REMOVE;[2,3];[Onion, Banana]
+	            2 Apple sold : REMOVE;[2];[Apple]
+                sold 3 bananas and 2 onions : REMOVE;[3,2];[Banana, Onion]
+
+	            3 Mangos received : INSERT;[3];[Mango] 
+	            4 Potato Chips obtained : INSERT;[4];[Potato Chips] 
+
+	What is the price of Banana? : STATUS;PRICE;[Banana]
+	How many apples are left? : STATUS;QUANTITY;[Apple]
+    How many apples and bananas are there?: STATUS;QUANTITY;[Apple, Banana]
+    Keep the item quantities in one list and the itemNames in another list, dont separate them''')
+    
+    
+    cmdContent = responseGen.text.upper().split(';')
+    # return {"response":cmdContent}
+    # itemQtys = list(map(int,cmdContent[1].strip('[').strip(']').split(',')))
+    itemNames = list(map(str,cmdContent[2].strip('[').strip(']').split(',')))
+    # return {"response":[itemNames,itemQtys]}
     dbOperation = cmdContent[0]
-    itemQty = int(cmdContent[1])
-    itemName = cmdContent[2].capitalize()
     responseDB = dbInv.find_one({"user_id": userId})
 
     if dbOperation == "INSERT":
+            itemQtys = list(map(int,cmdContent[1].strip('[').strip(']').split(',')))
             if responseDB:
+                for itemName,itemQty in zip(itemNames,itemQtys):
+                    itemName = itemName.lstrip().capitalize()
+                    item_exists = False
+                    for item in responseDB['items']:
+                        if item['item_name'] == itemName:
+                            dbInv.update_one(
+                                {"_id": responseDB['_id'], "items.item_name": itemName},
+                                {"$inc": {"items.$.item_qty": itemQty}}
+                            )
+                            item_exists = True
+                            if item['item_max'] <= item["item_qty"]+itemQty:
+                                replyToUser+= f"{itemQty} {itemName} added. {itemName} maximum limit reached. "
+                            else:
+                                replyToUser+= f"{itemQty} {itemName} added. "
+                    if not item_exists:
+                        dbInv.update_one(
+                            {"_id": responseDB['_id']},
+                            {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min":0,"item_max":100,"item_price":0.0}}}
+                        )
+                        replyToUser+= f"{itemQty} {itemName} inserted. Please update the minimum limit, maximum limit and price. "
+                        
+                
+            else:
+                replyToUser+= "User not found"
+
+    elif dbOperation == "REMOVE":
+        itemQtys = list(map(int,cmdContent[1].strip('[').strip(']').split(',')))
+        if responseDB:
+            for itemName,itemQty in zip(itemNames,itemQtys):
+                itemName = itemName.lstrip().capitalize()
                 item_exists = False
                 for item in responseDB['items']:
                     if item['item_name'] == itemName:
-                        dbInv.update_one(
-                            {"_id": responseDB['_id'], "items.item_name": itemName},
-                            {"$inc": {"items.$.item_qty": itemQty}}
-                        )
                         item_exists = True
-                        replyToUser = {"response": f"{itemQty} {itemName} added successfully"}
-                        
+                        if item['item_qty'] >= itemQty:
+                            dbInv.update_one(
+                                {"_id": responseDB['_id'], "items.item_name": itemName},
+                                {"$inc": {"items.$.item_qty": -itemQty}}
+                            )
+                            if item['item_qty']-itemQty <= item['item_min']:
+                                replyToUser+= f"Sold {itemQty} {itemName} . Less {itemName} available."
+                            else:
+                                replyToUser += f"Sold {itemQty} {itemName} ."
+                        else:
+                            replyToUser += f"{itemName} is currently over. "
                 
                 if not item_exists:
-                    dbInv.update_one(
-                        {"_id": responseDB['_id']},
-                        {"$push": {"items": {"item_name": itemName, "item_qty": itemQty}}}
-                    )
-                    replyToUser = {"response": f"{itemQty} {itemName} inserted successfully"}
-                
-            else:
-                replyToUser = {"response": "User not found"}
-
-    elif dbOperation == "REMOVE":
-        if responseDB:
-            # Check if the item exists in the inventory
-            item_exists = False
-            for item in responseDB['items']:
-                if item['item_name'] == itemName:
-                    item_exists = True
-                    if item['item_qty'] >= itemQty:
-                        # If the item's quantity is greater than or equal to the quantity to be removed, decrement the quantity
-                        # if the item quantity is below threshold, remove but alert with remaining qty -> pertains to restock
-                        dbInv.update_one(
-                            {"_id": responseDB['_id'], "items.item_name": itemName},
-                            {"$inc": {"items.$.item_qty": -itemQty}}
-                        )
-                        replyToUser = {"response": f"Sold {itemQty} {itemName} successfully"}
-                    else:
-                        replyToUser = {"response": f"{itemName} is currently over"}
-            
-            if not item_exists:
-                replyToUser = {"response": f"{itemName} was not found"}
+                    replyToUser+= f"{itemName} was not found. "
         else:
-            replyToUser = {"response": "User not found"}
+                replyToUser+= "User not found. "
 
         
 
     elif dbOperation == "STATUS":
-        itemName = cmdContent[1]
-        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
+        itemParam = cmdContent[1]
+        # itemNames = list(map(str,cmdContent[2].strip('[').strip(']').split(',')))
+        # responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
         if responseDB:
-            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
-            if item:
-                if item['item_qty'] > item['item_min']:
-                    return {"resp": f"{item['item_qty']} of {itemName} is available"}
-                elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
-                    return {"resp": f"{item['item_qty']} of {itemName} is available. low on stock"}
-                else:
-                    return {"resp": f"{itemName} is out of stock"}
-            else:
-                return {"resp": f"{itemName} is not available"}
-        else:
-            return {"resp": "User not found"}
-    # return {"cmd": cmdContent}
+            if itemParam == "QUANTITY":
+                for itemName in itemNames:
+                    itemName = itemName.lstrip().capitalize()
+                    item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+                    if item:
+                        if item['item_qty'] > item['item_min']:
+                            replyToUser+=  f"{item['item_qty']} of {itemName} is available. "
+                        elif item['item_qty'] > 0 and item['item_qty'] <= item['item_min']:
+                            replyToUser+=  f"{item['item_qty']} of {itemName} is available. {itemName} Quantity is Low. "
+                        else:
+                            replyToUser+=  f"{itemName} is currently over. "
+                    else:
+                        replyToUser+=  f"{itemName} is not available. "
 
-    return replyToUser
+            elif itemParam == "PRICE":
+                for itemName in itemNames:
+                    itemName = itemName.lstrip().capitalize()
+                    item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
+                    if item:
+                        replyToUser+= f"{itemName} price is {item['item_price']}. "
+                    else:
+                        replyToUser+=  f"{itemName} is not available. "
+            else:
+                replyToUser+=  "User not found"
+    reply = {"response":replyToUser}
+
+    return reply
+
+def process_img():
+    
+    imgPath = Path("./temp/image.jpeg")
+    imgConf = {
+        "mime/type": "image/jpeg",
+        "data": imgPath.read_bytes()
+    }
+
+    prompt = ['''how many of each object is present in the image?
+                 can you give me the output as 
+                 example : 
+                 for an image with 2 onions and 3 bananas: REMOVE;[2,3];[Onion, Banana] 
+                 for an image with 1 apple : REMOVE;[1];[Apple]''',
+            imgConf]
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
@@ -324,8 +381,9 @@ def process_ocr(srcLang,imgUri,ocrServiceId):
     finally:
         return responseOcr.json()
 
-@app.route('/process',methods = ["POST"])#https://localhost:5000/process
-def process_request():
+#OVERALL PROCESS
+@app.route('/processaudio',methods = ["POST"])#https://localhost:5000/process
+def process_audio_request():
     data = {}#should comprise of sourceLang, TargetLang
     try:
         if request.method == "POST":
@@ -334,6 +392,7 @@ def process_request():
             tgtLang = data.get("targetLanguage", "")
             audioContent = data.get("audioContent", "")
             imageUri = data.get("imageUri", "")
+            user_id = data.get("userId","")
 
         headers={
             "userID":userID,
@@ -397,20 +456,24 @@ def process_request():
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
         
         
-        responseLLM= process_instr(instruction=getCmd)
+        responseLLM= process_instr(instruction=getCmd,userId=user_id)
 
-
-        # responseDB = process_instr(instruction=genCmd)
-
+        # return responseLLM
+            
         responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
-        # return responseNmtTts
-        # return process_instr(instruction=getCmd,userId=ObjectId(logged_in_user))
+
+        return responseNmtTts
         # responseocr = process_ocr(srcLang=srcLang,imgUri="https://dhruvacentrali0960249713.blob.core.windows.net/haridas/Hindi-Bhasha.jpg",ocrServiceId=ocrServiceId)
         #return {"op":responseocr}
         
     #post request will be made to api -> response from that will be then processes by me to my LLM -> classification of received comamnd, prompt will be a mapping prompt -> this will in turn make a call to handle the database in some manner
 
-#HANDLE LOGIN SIGNUP
+
+@app.route('/processimage',methods = ["POST"])
+def process_image_request():
+    data = {}
+    #try except finally here -> get the response -> nmt tts -> to user 
+#HANDLE LOGIN/SIGNUP
 @app.route('/signup',methods=["POST"])
 def signup():
     if request.method == "POST":
@@ -462,7 +525,8 @@ def login():
     #can globally set the db to its documents
     
 
-@app.route('/change_password',methods=["POST"])
+#HANDLE USER AUTH CHANGES
+@app.route('/changepassword',methods=["POST"])
 def change_password():
     if request.method == "POST":
         credentials = request.json
@@ -484,7 +548,7 @@ def change_password():
             return jsonify({"error": "User not found"}), 404
         
 
-@app.route('/change_language',methods=["POST"])
+@app.route('/changelanguage',methods=["POST"])
 def change_language():
     if request.method == "POST":
         credentials = request.json
@@ -497,14 +561,53 @@ def change_language():
             return jsonify({"message": "Language changed successfully"}), 200
         else:
             return jsonify({"error": "User not found"}), 404
-        
-@app.route('/logout',methods=["POST"])
-def logout():
-    if request.method == "POST":
-        globals(logged_in_user = None)
-        return jsonify({"message": "Logout successful"}), 200
-        
-        
 
+#INVENTORY UPDATES        
+@app.route('/fetchinv',methods = ["POST"])
+def get_inventory():
+    responseDB = {}
+    if request.method == "POST":
+        credentials = request.json
+        userId = credentials.get("userId", "")
+
+        if userId:
+            if not isinstance(userId, ObjectId):
+                userId = ObjectId(userId)
+        
+        responseDB = dbInv.find_one({"user_id": userId})
+
+        items = responseDB['items']
+
+        responseItems =  {"items":items}
+
+        return responseItems
+    
+    
+@app.route('/updateinv', methods= ["POST"])
+def update_inventory():
+    responseDB = {}
+    if request.method == "POST":
+        credentials = request.json
+        userId = credentials.get("userId","")
+        items = credentials.get("items","")
+
+    if userId:
+        if not isinstance(userId, ObjectId):
+            userId = ObjectId(userId)
+
+    responseDB = dbInv.find_one({"user_id":userId})
+
+    result = dbInv.update_one(
+            {"user_id": userId},
+            {"$set": {"items": items}},
+        )
+
+    if result.modified_count > 0:
+            response = {"message": "Items updated successfully"}
+    else:
+            response = {"message": "No document found with the provided userId or items not updated"}
+        
+    return response
+        
 if __name__ == "__main__":
     app.run(debug=True)
