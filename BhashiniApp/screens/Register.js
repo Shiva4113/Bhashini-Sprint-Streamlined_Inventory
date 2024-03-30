@@ -3,16 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, Image, Modal, Pressable } from
 import { useNavigation } from '@react-navigation/native';
 
 export default function Login() {
-  const [language, setLanguage] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
   const navigation = useNavigation();
 
-  const handleLanguageChange = (value) => {
-    setLanguage(value);
-    setModalVisible(false);
-  };
-
-  const handleGetStarted = () => {
+  const handleLogin = () => {
     navigation.navigate('Dashboard');
   };
 
@@ -34,44 +27,12 @@ export default function Login() {
         <View style={{ marginBottom: 20 }}>
           <TextInput style={{ width: '100%', padding: 10, borderWidth: 2, borderColor: '#10b981', borderRadius: 10, backgroundColor: '#ccffeb' }} placeholder="ENTER PASSWORD" secureTextEntry={true} />
         </View>
-        {/* Language selection */}
-        <TouchableOpacity onPress={() => setModalVisible(true)} style={{ marginBottom: 20, borderWidth: 2, borderColor: '#10b981', borderRadius: 10, backgroundColor: '#ccffeb', padding: 10 }}>
-          <Text>{language ? language : 'Select Language'}</Text>
+        
+        <TouchableOpacity onPress={handleLogin} style={{ width: '100%', padding: 15, borderRadius: 10, backgroundColor: '#10b981', alignItems: 'center', marginTop: 20 }}>
+          <Text style={{ color: 'white', fontSize: 18 }}>Login</Text>
         </TouchableOpacity>
-        {/* Modal for language selection */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => {
-            setModalVisible(!modalVisible);
-          }}
-        >
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <View style={{ width: 300, borderRadius: 10, backgroundColor: '#fff', padding: 20 }}>
-              <TouchableOpacity onPress={() => handleLanguageChange('English')} style={{ marginBottom: 10 }}>
-                <Text>English</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleLanguageChange('Spanish')} style={{ marginBottom: 10 }}>
-                <Text>Spanish</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleLanguageChange('French')} style={{ marginBottom: 10 }}>
-                <Text>French</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleLanguageChange('German')} style={{ marginBottom: 10 }}>
-                <Text>German</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleLanguageChange('Chinese')} style={{ marginBottom: 10 }}>
-                <Text>Chinese</Text>
-              </TouchableOpacity>
-              <Pressable onPress={() => setModalVisible(!modalVisible)} style={{ marginTop: 20 }}>
-                <Text style={{ color: '#10b981', textAlign: 'center' }}>Close</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
-        <TouchableOpacity onPress={handleGetStarted} style={{ width: '100%', padding: 15, borderRadius: 10, backgroundColor: '#10b981', alignItems: 'center', marginTop: 20 }}>
-          <Text style={{ color: 'white', fontSize: 18 }}>Get Started</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('signup')}>
+          <Text style={{ color: '#10b981' ,marginTop:20,textAlign: 'right'}}>Not a Member? Signup Now</Text>
         </TouchableOpacity>
       </View>
     </View>

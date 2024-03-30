@@ -1,62 +1,66 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, Modal, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
 import axios from 'axios'; // Import Axios library
 import { useNavigation } from "@react-navigation/native";
+import DropDownPicker from 'react-native-dropdown-picker'; // Import DropDownPicker
 
 export default function Signup() {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('');
+  const [open, setOpen] = useState(false);
   const navigation = useNavigation();
-
-  // Function to send signup details to the backend
+  const [language, setLanguage] = React.useState([]);
+  // const languages = [
+  //   { label: 'English', value: 'English' },
+  //   { label: 'Hindi', value: 'Hindi' },
+  //   { label: 'Gujarati', value: 'Gujarati' },
+  //   { label: 'Tamil', value: 'Tamil' },
+  //   { label: 'Kannada', value: 'Kannada' },
+  //   { label: 'Telugu', value: 'Telugu' },
+  //   { label: 'Malayalam', value: 'Malayalam' }
+    
+  // ];
+  const languages = [
+    { label: 'English', value: 'English' },
+    { label: 'हिन्दी', value: 'Hindi' }, // Hindi
+    { label: 'ગુજરાતી', value: 'Gujarati' }, // Gujarati
+    { label: 'தமிழ்', value: 'Tamil' }, // Tamil
+    { label: 'ಕನ್ನಡ', value: 'Kannada' }, // Kannada
+    { label: 'తెలుగు', value: 'Telugu' }, // Telugu
+    { label: 'മലയാളം', value: 'Malayalam' } // Malayalam
+  ];
   const sendSignupDetails = async () => {
     try {
-      // Data to be sent in the POST request
       const signupData = {
         username: username,
         email: email,
         password: password,
         phoneNumber: phoneNumber,
-        language: selectedLanguage
+        language: language
       };
 
-      // Send the signup data to the backend API using Axios
       const response = await axios.post('https://localhost:5000/signup', signupData);
 
-      // Check if the request was successful
       if (response.status === 200) {
-        // Navigate to the Register screen after successful signup
         navigation.navigate("Register");
       } else {
         console.error('Signup failed:', response.data);
-        // Optionally, display an error message to the user
       }
     } catch (error) {
       console.error('Error:', error);
-      // Optionally, display an error message to the user
     }
   };
 
-  const handleLanguageSelection = (language) => {
-    setSelectedLanguage(language);
-    setModalVisible(false);
-  };
-
   const handleSignup = () => {
-    // Basic phone number validation for Indian phone numbers
-    const phoneNumberRegex = /^[6-9]\d{9}$/; // Regex to match Indian phone numbers
+    const phoneNumberRegex = /^[6-9]\d{9}$/;
     
     if (!phoneNumberRegex.test(phoneNumber)) {
-      // Invalid phone number format
       alert('Please enter a valid Indian phone number.');
       return;
     }
 
-    // Call sendSignupDetails function to send signup data to the backend
     sendSignupDetails();
   };
 
@@ -106,45 +110,35 @@ export default function Signup() {
           />
         </View>
         <View style={{ marginBottom: 20 }}>
-          <TouchableOpacity onPress={() => setModalVisible(true)} style={{ width: '100%', padding: 10, borderWidth: 2, borderColor: '#10b981', borderRadius: 10, backgroundColor: '#ccffeb', alignItems: 'center' }}>
-            <Text>{selectedLanguage ? selectedLanguage : 'Select Language'}</Text>
-          </TouchableOpacity>
-        </View>
+        <DropDownPicker
+        open={open} // Control the open state of the dropdown
+        value={language} // The current selected value
+        items={languages} // The list of items to display in the dropdown
+        setOpen={setOpen} // A function to change the open state
+        setValue={setLanguage} // A function to change the selected value
+        setItems={() => {}} // A function to change the items
+        containerStyle={{height: 40,width:'100%',alignSelf:'center'}}
+        style={{backgroundColor: '#e1fcf9'}}
+        itemStyle={{
+          justifyContent: 'flex-start'
+        }}
+        dropDownStyle={{backgroundColor: '#e1fcf9'}}
+        onChangeItem={item => setLanguage(item.value)} // Update the selected language
+        placeholder="Select Language" // Add the placeholder text
+        placeholderStyle={{ // Optional: Style the placeholder text
+          color: "grey",
+          fontWeight: "bold"
+        }}
+       />
+       </View>
         <TouchableOpacity onPress={handleSignup} style={{ width: '100%', padding: 15, borderRadius: 10, backgroundColor: '#10b981', alignItems: 'center' }}>
           <Text style={{ color: 'white', fontSize: 18 }}>Sign Up</Text>
         </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <Text style={{ color: '#10b981' ,marginTop:20,textAlign: 'right'}}>Already have an account? Login</Text>
+        </TouchableOpacity>
       </View>
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(!modalVisible);
-        }}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <View style={{ width: 300, borderRadius: 10, backgroundColor: '#fff', padding: 20 }}>
-            <TouchableOpacity onPress={() => handleLanguageSelection('English')} style={{ marginBottom: 10 }}>
-              <Text>English</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleLanguageSelection('Spanish')} style={{ marginBottom: 10 }}>
-              <Text>Spanish</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleLanguageSelection('French')} style={{ marginBottom: 10 }}>
-              <Text>French</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleLanguageSelection('German')} style={{ marginBottom: 10 }}>
-              <Text>German</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleLanguageSelection('Chinese')} style={{ marginBottom: 10 }}>
-              <Text>Chinese</Text>
-            </TouchableOpacity>
-            <Pressable onPress={() => setModalVisible(!modalVisible)} style={{ marginTop: 20 }}>
-              <Text style={{ color: '#10b981', textAlign: 'center' }}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      
     </View>
   );
 }
