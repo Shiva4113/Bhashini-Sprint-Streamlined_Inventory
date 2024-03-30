@@ -5,9 +5,10 @@ import requests
 from dotenv import load_dotenv, dotenv_values
 import google.generativeai as genai
 from pymongo import MongoClient
-from bson.objectid import ObjectId
+from bson import ObjectId, json_util
 from pymongo.errors import ConnectionFailure
 from bcrypt import gensalt,hashpw,checkpw
+import json
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -30,6 +31,12 @@ dbStats = None
 generation_config = None
 safety_settings = None
 model = None
+
+
+#parse json
+def parse_json(data):
+    return json.loads(json_util.dumps(data))
+
 
 #GEMINI CONFIGURATION
 def setGemini():
@@ -91,11 +98,7 @@ def home():
     # return jsonify({})
     pass
 
-#HANDLE DATABASE
-def process_db():
-    pass
-
-#HANDLE LLM - GEMINI
+#HANDLE DB with LLM - GEMINI
 def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     '''
     Here I will work on the database -> CRUD
@@ -108,7 +111,56 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
     cmdContent = responseGen.text.upper().split()
 
     dbOperation = cmdContent[0]
-    if dbOperation == "STATUS":
+    itemQty = int(cmdContent[1])
+    itemName = cmdContent[2].capitalize()
+    responseDB = dbInv.find_one({"user_id": userId})
+
+    if dbOperation == "INSERT":
+            if responseDB:
+                item_exists = False
+                for item in responseDB['items']:
+                    if item['item_name'] == itemName:
+                        dbInv.update_one(
+                            {"_id": responseDB['_id'], "items.item_name": itemName},
+                            {"$inc": {"items.$.item_qty": itemQty}}
+                        )
+                        item_exists = True
+                        return {"resp": f"{itemQty} {itemName} added successfully"}
+                        
+                
+                if not item_exists:
+                    dbInv.update_one(
+                        {"_id": responseDB['_id']},
+                        {"$push": {"items": {"item_name": itemName, "item_qty": itemQty}}}
+                    )
+                    return {"resp": f"{itemQty} {itemName} inserted successfully"}
+                
+            else:
+                return {"resp": "User not found"}
+
+    elif dbOperation == "REMOVE":
+        if responseDB:
+            # Check if the item exists in the inventory
+            item_exists = False
+            for item in responseDB['items']:
+                if item['item_name'] == itemName:
+                    item_exists = True
+                    if item['item_qty'] >= itemQty:
+                        # If the item's quantity is greater than or equal to the quantity to be removed, decrement the quantity
+                        dbInv.update_one(
+                            {"_id": responseDB['_id'], "items.item_name": itemName},
+                            {"$inc": {"items.$.item_qty": -itemQty}}
+                        )
+                        return {"resp": f"{itemQty} {itemName} removed successfully"}
+                    else:
+                        return {"resp": f"Not enough {itemName} in inventory"}
+            
+            if not item_exists:
+                return {"resp": f"{itemName} not found in inventory"}
+        else:
+            return {"resp": "User not found"}
+
+    elif dbOperation == "STATUS":
         itemName = cmdContent[1]
         responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
         if responseDB:
@@ -124,24 +176,8 @@ def process_instr(instruction, userId = '6606acd1b2642d0dc8a3f1ba'):
                 return f"{itemName} is not available"
         else:
             return f"{itemName} is not available"
-
-    elif dbOperation == "INSERT":
-        itemQty = int(cmdContent[1])
-        itemName = cmdContent[2]
-        responseDB = dbInv.find_one({"user_id": userId, "items.item_name": itemName})
-        if responseDB:
-            item = next((item for item in responseDB['items'] if item['item_name'] == itemName), None)
-            if item:
-                dbInv.update_one({"user_id": userId, "items.item_name": itemName}, {"$inc": {"items.$.item_qty": itemQty}})
-                return f"{itemQty} {itemName} added to inventory"
-            else:
-                dbInv.update_one({"user_id": userId}, {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min": 10}}})
-                return f"{itemQty} {itemName} added to inventory"
-        else:
-            dbInv.insert_one({"user_id": userId, "items": [{"item_name": itemName, "item_qty": itemQty, "item_min": 10}]})
-            return f"{itemQty} {itemName} added to inventory"
-
-    return {"cmd": cmdContent}
+    # return {"cmd": cmdContent}
+    
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
