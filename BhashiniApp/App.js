@@ -2,7 +2,7 @@ import * as React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { useFonts } from "expo-font";
 import SignUpPage from "./screens/signup";
-import Register from "./screens/Register";
+import Login from "./screens/Login";
 import Dashboard from "./screens/Dashboard";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import Settings from "./screens/settings";
@@ -10,11 +10,24 @@ import ChangePassword from "./screens/changepassword";
 import YourProfile from "./screens/YourProfile";
 import NotificationsPage from "./screens/notification";
 import Inventory from "./screens/Inventory";
+// import UserContext from "./userContext";
+import { useState } from "react";
+
+
 // import PlayAudioFile from "./screens/reading_audiofile";
 const Stack = createNativeStackNavigator();
 
-
 const App = () => {
+  // const [user, setUser] = useState(null);
+
+  // const login = (userData) => {
+  //   setUser(userData);
+  // };
+
+  // const logout = () => {
+  //   setUser(null);
+  // };
+
   const [hideSplashScreen, setHideSplashScreen] = React.useState(true);
 
   const [fontsLoaded, error] = useFonts({
@@ -32,15 +45,14 @@ const App = () => {
     <NavigationContainer>
       {hideSplashScreen ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-        
           <Stack.Screen
             name="signup"
             component={SignUpPage}
             options={{ headerShown: false }}
           />
           <Stack.Screen
-            name="Register"
-            component={Register}
+            name="Login"
+            component={Login}
             options={{ headerShown: false }}
           />
           <Stack.Screen
@@ -48,15 +60,15 @@ const App = () => {
             component={Dashboard}
             options={{ headerShown: false }}
           />
-          
+
           <Stack.Screen
             name="Settings"
             component={Settings}
             options={{ headerShown: true }}
           />
-          
+
           <Stack.Screen
-            name="Changepassword"
+            name="ChangePassword"
             component={ChangePassword}
             options={{ headerShown: true }}
           />
@@ -64,18 +76,17 @@ const App = () => {
             name="YourProfile"
             component={YourProfile}
             options={{ headerShown: true }}
-          /> 
+          />
           <Stack.Screen
             name="NotificationPage"
             component={NotificationsPage}
             options={{ headerShown: true }}
-          /> 
+          />
           <Stack.Screen
             name="Inventory"
             component={Inventory}
             options={{ headerShown: true }}
-          /> 
-
+          />
         </Stack.Navigator>
       ) : null}
     </NavigationContainer>

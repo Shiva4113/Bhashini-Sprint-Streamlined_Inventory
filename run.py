@@ -10,7 +10,7 @@ from pymongo.errors import ConnectionFailure
 from bcrypt import gensalt,hashpw,checkpw
 import json
 from pathlib import Path
-
+from flask_cors import CORS
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -99,7 +99,7 @@ dbConnect()
 
 #FLASK
 app = Flask(__name__)
-
+CORS(app)
 # @app.route('/')#https://localhost:5000
 # def home():
    
@@ -512,11 +512,13 @@ def login():
         pwd = credentials["password"]
 
         user = dbUserAuth.find_one({"username": username})
+        user_id = user["_id"]
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
-                globals(logged_in_user = user["_id"])
-                return jsonify({"message": "Login successful"}), 200
+
+                return jsonify({"message": "Login successful",
+                                "user_id":str(user_id)}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401
         else:
@@ -530,17 +532,20 @@ def login():
 def change_password():
     if request.method == "POST":
         credentials = request.json
-        username = credentials["username"]
+        user_id = credentials["userId"]
         pwd = credentials["password"]
         newPwd = credentials["new_password"]
 
-        user = dbUserAuth.find_one({"username": username})
+        if not isinstance(user_id, ObjectId):
+            user_id = ObjectId(user_id)
+        
+        user = dbUserAuth.find_one({"user_id": user_id})
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
                 salt = gensalt()
                 hashedPwd = hashpw(newPwd.encode('utf-8'),salt)
-                dbUserAuth.update_one({"username": username}, {"$set": {"password": hashedPwd}})
+                dbUserAuth.update_one({"user_id": user_id}, {"$set": {"password": hashedPwd}})
                 return jsonify({"message": "Password changed successfully"}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401
@@ -610,4 +615,4 @@ def update_inventory():
     return response
         
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True,host="0.0.0.0")
