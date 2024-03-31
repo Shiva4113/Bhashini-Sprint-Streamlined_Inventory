@@ -532,20 +532,20 @@ def login():
 def change_password():
     if request.method == "POST":
         credentials = request.json
-        user_id = credentials["userId"]
-        pwd = credentials["password"]
-        newPwd = credentials["new_password"]
+        user_id = credentials.get("userId","")
+        pwd = credentials.get("password","")
+        newPwd = credentials.get("newPassword","")
 
         if not isinstance(user_id, ObjectId):
             user_id = ObjectId(user_id)
         
-        user = dbUserAuth.find_one({"user_id": user_id})
+        user = dbUserAuth.find_one({"_id": user_id})
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
                 salt = gensalt()
                 hashedPwd = hashpw(newPwd.encode('utf-8'),salt)
-                dbUserAuth.update_one({"user_id": user_id}, {"$set": {"password": hashedPwd}})
+                dbUserAuth.update_one({"_id": user_id}, {"$set": {"password": hashedPwd}})
                 return jsonify({"message": "Password changed successfully"}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401

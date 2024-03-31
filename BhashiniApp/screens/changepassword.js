@@ -15,17 +15,17 @@ const ChangePassword = () => {
     }
   
     let userID = await SecureStore.getItemAsync("userID");
-    
+    console.log("user id from secure store:",userID)
     try {
-      const response = await fetch("https://192.168.68.104:5000/changepassword", {
+      const response = await fetch("http://192.168.68.104:5000/changepassword", {
          method: 'POST',
          headers: {
            'Content-Type': 'application/json',
          },
          body: JSON.stringify({
            userId: userID,
-           pwd: oldPassword,
-           newPwd: newPassword,
+           password: oldPassword,
+           newPassword: newPassword,
          }),
       });
      
@@ -38,6 +38,7 @@ const ChangePassword = () => {
          Alert.alert("Error", "Failed to change password");
       }
      } catch (error) {
+      console.log(error)
       Alert.alert("Error", "An error occurred while changing password");
      }
      
