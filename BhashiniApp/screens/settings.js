@@ -20,23 +20,8 @@ const Settings = () => {
 
   const doUserLogOut = async function () {
     try {
-      // Assuming you have a token stored in localStorage or another secure place
-      //   const token = localStorage.getItem('token');
-
-      //   // Construct the request headers, including the token for authentication
-      //   const headers = {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': Bearer ${token}
-      //   };
-
-      //   // Send the POST request to the logout endpoint
-      //   const response = await axios.post('http://yourbackend.com/api/logout', {}, { headers });
-
-      //   // Handle the response, e.g., clear user data, redirect to login page, etc.
-      //   console.log('Logout successful:', response.data);
-      // Navigate to the login screen or the first screen of your app
       await SecureStore.deleteItemAsync("userID");
-      navigation.navigate("Login"); // Adjust the screen name as necessary
+      navigation.navigate("Login");
     } catch (error) {
       console.error("Error logging out:", error.message);
     }

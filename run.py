@@ -512,7 +512,10 @@ def login():
         pwd = credentials["password"]
 
         user = dbUserAuth.find_one({"username": username})
-        user_id = user["_id"]
+        if user:
+            user_id = user["_id"]
+        else:
+            return jsonify({"error":"User not found","user_id":""})
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
