@@ -391,7 +391,7 @@ def process_audio_request():
             srcLang = data.get("sourceLanguage", "")
             tgtLang = data.get("targetLanguage", "")
             audioContent = data.get("audioContent", "")
-            imageUri = data.get("imageUri", "")
+            # imageUri = data.get("imageUri", "")
             user_id = data.get("userId","")
 
         headers={
@@ -440,9 +440,10 @@ def process_audio_request():
         responseServices = requests.post(GET_SERVICE_ENDPOINT,json=langPayload,headers=headers)
 
         
-
+        if audioContent:
+            return jsonify({"response":"received audio"}), 200
     except Exception as e:
-        return {"error":str(e)},500
+        return {"error":str(e)},404
         
     finally:
         
@@ -458,7 +459,7 @@ def process_audio_request():
         
         responseLLM= process_instr(instruction=getCmd,userId=user_id)
 
-        return responseLLM
+        # return responseLLM
             
         responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
 
