@@ -10,13 +10,14 @@ const Settings = () => {
  const [open, setOpen] = useState(false);
  const [language, setLanguage] = React.useState([]);
  const languages = [
-    { label: 'English', value: 'English' },
-    { label: 'Spanish', value: 'Spanish' },
-    { label: 'Portuguese', value: 'Portuguese' },
-    { label: 'French', value: 'French' },
-    { label: 'German', value: 'German' },
-    // Add more languages as needed
- ];
+  { label: 'English', value: 'en' },
+  { label: 'हिन्दी', value: 'hi' }, // Hindi
+  { label: 'ગુજરાતી', value: 'gu' }, // Gujarati
+  { label: 'தமிழ்', value: '  ta' }, // Tamil
+  { label: 'ಕನ್ನಡ', value: 'kn' }, // Kannada
+  { label: 'తెలుగు', value: 'te' }, // Telugu
+  { label: 'മലയാളം', value: 'ml' } // Malayalam
+];
 
  const doUserLogOut = async function() {
     try {
@@ -35,7 +36,7 @@ const Settings = () => {
     //   // Handle the response, e.g., clear user data, redirect to login page, etc.
     //   console.log('Logout successful:', response.data);
       // Navigate to the login screen or the first screen of your app
-      navigation.navigate('Register'); // Adjust the screen name as necessary
+      navigation.navigate('Login'); // Adjust the screen name as necessary
     } catch (error) {
       console.error('Error logging out:', error.message);
     }
