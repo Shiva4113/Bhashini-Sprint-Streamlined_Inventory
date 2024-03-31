@@ -12,24 +12,16 @@ export default function Signup() {
   const [open, setOpen] = useState(false);
   const navigation = useNavigation();
   const [language, setLanguage] = React.useState([]);
-  // const languages = [
-  //   { label: 'English', value: 'English' },
-  //   { label: 'Hindi', value: 'Hindi' },
-  //   { label: 'Gujarati', value: 'Gujarati' },
-  //   { label: 'Tamil', value: 'Tamil' },
-  //   { label: 'Kannada', value: 'Kannada' },
-  //   { label: 'Telugu', value: 'Telugu' },
-  //   { label: 'Malayalam', value: 'Malayalam' }
 
-  // ];
   const languages = [
-    { label: "English", value: "en" },
-    { label: "हिन्दी", value: "hi" }, // Hindi
-    { label: "ગુજરાતી", value: "gu" }, // Gujarati
-    { label: "தமிழ்", value: "Tamil" }, // Tamil
-    { label: "ಕನ್ನಡ", value: "kd" }, // Kannada
-    { label: "తెలుగు", value: "Telugu" }, // Telugu
-    { label: "മലയാളം", value: "ml" }, // Malayalam
+    { label: 'English', value: 'en' },
+    { label: 'हिन्दी', value: 'hi' }, // Hindi
+    { label: 'ગુજરાતી', value: 'gu' }, // Gujarati
+    { label: 'தமிழ்', value: '  ta' }, // Tamil
+    { label: 'ಕನ್ನಡ', value: 'kn' }, // Kannada
+    { label: 'తెలుగు', value: 'te' }, // Telugu
+    { label: 'മലയാളം', value: 'ml' } // Malayalam
+
   ];
   const sendSignupDetails = async () => {
     try {
@@ -212,10 +204,8 @@ export default function Signup() {
         >
           <Text style={{ color: "white", fontSize: 18 }}>Sign Up</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-          <Text style={{ color: "#10b981", marginTop: 20, textAlign: "right" }}>
-            Already have an account? Login
-          </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <Text style={{ color: '#10b981' ,marginTop:20,textAlign: 'right'}}>Already have an account? Login</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,25 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import axios from 'axios';
-
+import * as SecureStore from "expo-secure-store";
 const YourProfile = () => {
  const [profileData, setProfileData] = useState({
     username: '',
     email: '',
-    phoneNumber: '',
+    mobile: 0,
  });
 
  useEffect(() => {
-    const fetchProfileData = async () => {
+   const fetchProfileData = async () => {
       try {
-        // Replace 'YOUR_API_ENDPOINT' with your actual API endpoint
-        const response = await axios.get('...');
-        setProfileData(response.data);
+        let userID = await SecureStore.getItemAsync("userID");
+        console.log("uid:", userID);
+    
+        const response = await fetch("http://192.168.68.104:5000/profile", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ "userId": userID })
+        });
+    
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+        else {
+          console.log(response);
+        }
+    
+        const userProfile = await response.json();
+        setProfileData(userProfile);
       } catch (error) {
-        console.error('Error fetching profile data:', error);
+        console.error("Error fetching user profile:", error);
       }
     };
-
+    
     fetchProfileData();
  }, []);
 
@@ -27,7 +44,7 @@ const YourProfile = () => {
     <View style={styles.container}>
       <Text style={styles.text}>Username: {profileData.username}</Text>
       <Text style={styles.text}>Email: {profileData.email}</Text>
-      <Text style={styles.text}>Phone Number: {profileData.phoneNumber}</Text>
+      <Text style={styles.text}>Phone Number: {profileData.mobile}</Text>
     </View>
  );
 };

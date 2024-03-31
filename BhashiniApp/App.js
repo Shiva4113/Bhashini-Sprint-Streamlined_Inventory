@@ -14,19 +14,12 @@ import Inventory from "./screens/Inventory";
 import { useState } from "react";
 
 
+import AddItem from "./screens/AddInventory";
+import MyScreen from "./screens/SampleButton";
 // import PlayAudioFile from "./screens/reading_audiofile";
 const Stack = createNativeStackNavigator();
 
 const App = () => {
-  // const [user, setUser] = useState(null);
-
-  // const login = (userData) => {
-  //   setUser(userData);
-  // };
-
-  // const logout = () => {
-  //   setUser(null);
-  // };
 
   const [hideSplashScreen, setHideSplashScreen] = React.useState(true);
 
@@ -86,7 +79,13 @@ const App = () => {
             name="Inventory"
             component={Inventory}
             options={{ headerShown: true }}
-          />
+          /> 
+          <Stack.Screen
+            name="AddItem"
+            component={AddItem}
+            options={{ headerShown: true }}
+          /> 
+
         </Stack.Navigator>
       ) : null}
     </NavigationContainer>

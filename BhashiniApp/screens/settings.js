@@ -6,17 +6,18 @@ import { useNavigation } from "@react-navigation/native";
 import * as SecureStore from "expo-secure-store";
 
 const Settings = () => {
-  const navigation = useNavigation();
-  const [open, setOpen] = useState(false);
-  const [language, setLanguage] = React.useState([]);
-  const languages = [
-    { label: "English", value: "English" },
-    { label: "Spanish", value: "Spanish" },
-    { label: "Portuguese", value: "Portuguese" },
-    { label: "French", value: "French" },
-    { label: "German", value: "German" },
-    // Add more languages as needed
-  ];
+ const navigation = useNavigation();
+ const [open, setOpen] = useState(false);
+ const [language, setLanguage] = React.useState([]);
+ const languages = [
+  { label: 'English', value: 'en' },
+  { label: 'हिन्दी', value: 'hi' }, // Hindi
+  { label: 'ગુજરાતી', value: 'gu' }, // Gujarati
+  { label: 'தமிழ்', value: '  ta' }, // Tamil
+  { label: 'ಕನ್ನಡ', value: 'kn' }, // Kannada
+  { label: 'తెలుగు', value: 'te' }, // Telugu
+  { label: 'മലയാളം', value: 'ml' } // Malayalam
+];
 
   const doUserLogOut = async function () {
     try {

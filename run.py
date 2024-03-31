@@ -112,9 +112,9 @@ def process_instr(instruction, userId):
     if not isinstance(userId, ObjectId):
         userId = ObjectId(userId)
     
-    responseGen = modelText.generate_content(f'''{instruction}.(context: I am the shopkeeper, selling is removal and receiving is insertion)
+    responseGen = modelText.generate_content(f'''{instruction}.(context: I am the shopkeeper, selling is REMOVE and receiving is INSERT)
     For anything related to selling : REMOVE
-    For anything related to receiving : INSERT
+    For anything related to receiving, getting something, gaining something: INSERT
     For anything that checks for item properties : STATUS
 
     examples :  2 Onions 3 Bananas sold : REMOVE;[2,3];[Onion, Banana]
@@ -458,7 +458,7 @@ def process_audio_request():
         
         responseLLM= process_instr(instruction=getCmd,userId=user_id)
 
-        # return responseLLM
+        return responseLLM
             
         responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
 
@@ -515,7 +515,7 @@ def login():
         if user:
             user_id = user["_id"]
         else:
-            return jsonify({"error":"User not found","user_id":""})
+            return jsonify({"error":"User not found","user_id":""}), 404
         if user:
             userPwd = user["password"]
             if checkpw(pwd.encode('utf-8'),userPwd):
@@ -560,12 +560,15 @@ def change_password():
 def change_language():
     if request.method == "POST":
         credentials = request.json
-        username = credentials["username"]
         language = credentials["language"]
+        user_id = credentials["userId"]
+        
+        if not isinstance(user_id, ObjectId):
+            user_id = ObjectId(user_id)
 
-        user = dbUserAuth.find_one({"username": username})
+        user = dbUserAuth.find_one({"_id": user_id})
         if user:
-            dbUserAuth.update_one({"username": username}, {"$set": {"language": language}})
+            dbUserAuth.update_one({"_id": user_id}, {"$set": {"language": language}})
             return jsonify({"message": "Language changed successfully"}), 200
         else:
             return jsonify({"error": "User not found"}), 404
@@ -616,6 +619,21 @@ def update_inventory():
             response = {"message": "No document found with the provided userId or items not updated"}
         
     return response
-        
+
+
+@app.route('/profile',methods= ['POST'])
+def get_profile():
+    if request.method == "POST":
+        credentials = request.json
+        userId = credentials.get("userId","")
+
+        if not isinstance(userId, ObjectId):
+            userId = ObjectId(userId)
+
+        user = dbUserAuth.find_one({"_id": userId})
+
+        if user:
+            return jsonify({"username":user["username"],"email":user["email"],"mobile":user["mobile_no"]}),200   
+
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0")
