@@ -11,8 +11,10 @@ import YourProfile from "./screens/YourProfile";
 import NotificationsPage from "./screens/notification";
 import Inventory from "./screens/Inventory";
 import AddItem from "./screens/AddInventory";
-import MyScreen from "./screens/SampleButton";
+import EditItem from "./screens/EditItem";
+
 // import PlayAudioFile from "./screens/reading_audiofile";
+import LanguageSelectionScreen from "./screens/LanguageSelection";
 const Stack = createNativeStackNavigator();
 
 
@@ -34,11 +36,6 @@ const App = () => {
     <NavigationContainer>
       {hideSplashScreen ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {/* <Stack.Screen
-            name="SampleButton"
-            component={MyScreen}
-            options={{ headerShown: false }}
-          /> */}
           <Stack.Screen
             name="signup"
             component={SignUpPage}
@@ -72,7 +69,7 @@ const App = () => {
             options={{ headerShown: true }}
           /> 
           <Stack.Screen
-            name="NotificationPage"
+            name="NotificationsPage"
             component={NotificationsPage}
             options={{ headerShown: true }}
           /> 
@@ -84,6 +81,16 @@ const App = () => {
           <Stack.Screen
             name="AddItem"
             component={AddItem}
+            options={{ headerShown: true }}
+          /> 
+          <Stack.Screen
+            name="LanguageSelection"
+            component={LanguageSelectionScreen}
+            options={{ headerShown: true }}
+          /> 
+          <Stack.Screen
+            name="EditItem"
+            component={EditItem}
             options={{ headerShown: true }}
           /> 
 

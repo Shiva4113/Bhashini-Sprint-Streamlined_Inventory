@@ -25,6 +25,9 @@ const Inventory = ({ navigation }) => {
         <Text style={styles.itemName}>{item.name}</Text>
         <Text>Quantity: {item.quantity}</Text>
         <Text>Price: ${item.price.toFixed(2)}</Text>
+        <Text>Min_quantity: {item.min_quantity}</Text>
+        <Text>Max_Quantity: {item.max_quantity}</Text>
+
       </View>
     </TouchableOpacity>
   );
