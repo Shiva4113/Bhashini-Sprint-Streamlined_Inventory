@@ -11,6 +11,7 @@ from bcrypt import gensalt,hashpw,checkpw
 import json
 from pathlib import Path
 from flask_cors import CORS
+from PIL import Image
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -229,18 +230,19 @@ def process_instr(instruction, userId):
 
 def process_img():
     
-    imgPath = Path("./temp/image.jpeg")
-    imgConf = {
-        "mime/type": "image/jpeg",
-        "data": imgPath.read_bytes()
-    }
+    imgPath = Path("./images/3onions.jpeg")
+    img = Image.open(imgPath)
 
     prompt = ['''how many of each object is present in the image?
                  can you give me the output as 
                  example : 
                  for an image with 2 onions and 3 bananas: REMOVE;[2,3];[Onion, Banana] 
                  for an image with 1 apple : REMOVE;[1];[Apple]''',
-            imgConf]
+            img]
+    
+    responseGen = modelVision.generate_content(prompt)
+    cmdContent = responseGen.text.upper().split(';')
+    return cmdContent
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
@@ -472,8 +474,113 @@ def process_audio_request():
 
 @app.route('/processimage',methods = ["POST"])
 def process_image_request():
-    data = {}
-    #try except finally here -> get the response -> nmt tts -> to user 
+    replyToUser = ""
+    if request.method == "POST":
+        credentials = request.json
+        userId = credentials.get("userId", "")
+        if not isinstance(userId, ObjectId):
+            userId = ObjectId(userId)
+        cmdContent = process_img()
+        dbOperation = cmdContent[0].strip()
+        itemNames = list(map(str,cmdContent[2].strip('[').strip(']').split(',')))
+        responseDB = dbInv.find_one({"user_id": userId})
+        if dbOperation == "REMOVE":
+            itemQtys = list(map(int,cmdContent[1].strip('[').strip(']').split(',')))
+            if responseDB:
+                for itemName,itemQty in zip(itemNames,itemQtys):
+                    itemName = itemName.lstrip().capitalize()
+                    item_exists = False
+                    for item in responseDB['items']:
+                        if item['item_name'] == itemName:
+                            item_exists = True
+                            if item['item_qty'] >= itemQty:
+                                dbInv.update_one(
+                                    {"_id": responseDB['_id'], "items.item_name": itemName},
+                                    {"$inc": {"items.$.item_qty": -itemQty}}
+                                )
+                                if item['item_qty']-itemQty <= item['item_min']:
+                                    replyToUser+= f"Sold {itemQty} {itemName} . Less {itemName} available."
+                                else:
+                                    replyToUser += f"Sold {itemQty} {itemName} ."
+                            else:
+                                replyToUser += f"{itemName} is currently over. "
+                    
+                    if not item_exists:
+                        replyToUser+= f"{itemName} was not found. "
+            else:
+                    replyToUser+= "User not found. "
+    
+        reply = {"response":replyToUser}
+        
+        try:
+            if request.method == "POST":
+                data = request.json
+                srcLang = data.get("sourceLanguage", "")
+                tgtLang = data.get("targetLanguage", "")
+
+            headers={
+                "userID":userID,
+                "ulcaApiKey":ulcaApiKey
+            }
+
+            pipelineTasks = [
+                    {
+                        "taskType": "asr",
+                        "config": {
+                            "language": {
+                                "sourceLanguage": srcLang
+                            }
+                        }
+                    },
+                    {
+                        "taskType": "translation",
+                        "config": {
+                            "language": {
+                                "sourceLanguage": srcLang,
+                                "targetLanguage": tgtLang
+                            }
+                        }
+                    },
+                    {
+                        "taskType": "tts",
+                        "config": {
+                            "language": {
+                                "sourceLanguage": tgtLang
+                            }
+                        }
+                    }
+                ]
+
+            
+            pipelineRequestConfig = {
+                    "pipelineId": pipelineId
+                }
+
+            langPayload = {
+                    "pipelineTasks": pipelineTasks,
+                    "pipelineRequestConfig": pipelineRequestConfig
+                }
+
+            responseServices = requests.post(GET_SERVICE_ENDPOINT,json=langPayload,headers=headers)
+
+            
+
+        except Exception as e:
+            return {"error":str(e)},500
+            
+        finally:
+            
+            asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
+            nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
+            ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
+            ocrServiceId = "bhashini-anuvaad-tesseract-ocr-printed-line-all"#this is the only given ocr service ID
+
+        # return responseLLM
+            
+        responseNmtTts = process_nmt_tts(textContent = reply["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
+
+        return responseNmtTts
+
 #HANDLE LOGIN/SIGNUP
 @app.route('/signup',methods=["POST"])
 def signup():
