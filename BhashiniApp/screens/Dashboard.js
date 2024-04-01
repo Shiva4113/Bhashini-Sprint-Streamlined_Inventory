@@ -1,32 +1,20 @@
 import React, { useState } from "react";
-import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity } from "react-native";
+import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable } from "react-native";
 import { Color, Border, FontFamily, FontSize } from "../GlobalStyles";
 import { Audio } from "expo-av";
-// import { SvgXml } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
 import { Camera } from 'expo-camera';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
-// import Microphone from "../assets/svg/microphone";
+import * as SecureStore from 'expo-secure-store'
+
 import { useCallback } from "react";
-import * as SecureStore from "expo-secure-store"
 
 const Dashboard = () => {
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
-  const cameraIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
- `;
-
- const inventoryIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-box"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
- `;
-
- const micIcon = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mic"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
- `;
 
   const cameraRef = useCallback(ref => {
     if (ref !== null) {
@@ -39,52 +27,35 @@ const Dashboard = () => {
   };
 
   const takePicture = async () => {
+    console.log("buttonclicked");
     if (cameraRef.current) {
+      console.log(cameraRef.current);
       try {
         const { uri } = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: true });
         console.log('Picture taken:', uri);
-
+  
         // Generate a unique filename
         const filename = `GeneratedImage_${Date.now()}.jpg`;
-
+  
         // Create a directory for saving images if it doesn't exist
         const directory = `${FileSystem.documentDirectory}images/`;
         await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-
+  
         // Save the image to the directory
         const savedImage = await FileSystem.moveAsync({
           from: uri,
           to: `${directory}${filename}`,
         });
-
+  
         console.log('Image saved:', savedImage);
       } catch (error) {
         console.error('Failed to take picture:', error);
       }
+    } else {
+      console.log('Camera ref is not yet available');
     }
- };
-
- const sendAudioToBackend = async (base64Audio) => {
-  try {
-    let userID = await SecureStore.getItemAsync("userID");
-    const response = await fetch('http://192.168.68.104:5000/processaudio', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ audioContent: base64Audio, userId: userID, sourceLanguage : "hi", targetLanguage : "en" }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to send audio to backend');
-    }
-
-    console.log('Audio sent successfully', response);
-  } catch (error) {
-    console.error('Failed to send audio to backend', error);
-  }
-};
-
+  };
+  
 
   const startRecording = async () => {
     try {
@@ -95,7 +66,7 @@ const Dashboard = () => {
       }
       if (!isRecording) {
         const recordingInstance = new Audio.Recording();
-        await recordingInstance.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY);
+        await recordingInstance.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY, Audio.AndroidAudioEncoder = "", Audio.AndroidOutputFormat = "mp3");
         await recordingInstance.startAsync();
         setRecording(recordingInstance);
         setIsRecording(true);
@@ -113,8 +84,7 @@ const Dashboard = () => {
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         const base64 = await convertAudioToBase64(uri);
-        console.log(base64)
-        await sendAudioToBackend(base64); // Await the sendAudioToBackend function
+        sendAudioToBackend(base64);
         setRecording(null);
         setIsRecording(false);
       }
@@ -139,75 +109,115 @@ const Dashboard = () => {
     }
   };
 
-const playAudioFromBase64 = async (base64String) => {
+  const sendAudioToBackend = async (base64Audio) => {
     try {
-      // Convert base64 string to binary data
-      const audioData = atob(base64String);
-      const bytes = new Uint8Array(audioData.length);
-      for (let i = 0; i < audioData.length; i++) {
-        bytes[i] = audioData.charCodeAt(i);
+      console.log(base64Audio)
+      let userID = await SecureStore.getItemAsync("userID");
+      const response = await fetch('http://10.1.3.186:5000/processaudio', {
+        method: 'POST',
+        headers: {
+           'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+           sourceLanguage: "hi",
+           targetLanguage: "en",
+           audioContent: base64Audio,
+           userId: userID
+        })
+       });
+       
+      console.log('Audio sent successfully', response);
+      playAudioFromBase64(base64Audio);
+    } catch (error) {
+      console.error('Failed to send audio to backend!!', error);
+    }
+  };
+
+  const playAudioFromBase64 = async (base64String) => {
+    try {
+      // Decode base64 string to binary data
+      const binaryData = atob(base64String);
+      const byteArray = new Uint8Array(binaryData.length);
+      for (let i = 0; i < binaryData.length; i++) {
+        byteArray[i] = binaryData.charCodeAt(i);
       }
-      const audioBuffer = new Uint8Array(bytes);
-
-      // Load the audio buffer
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/mpeg;base64,${base64String}` },
-        { shouldPlay: true }
-      );
-
-      // Play the audio
-      setSound(sound);
+  
+      // Create audio context and decode audio data
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(byteArray.buffer);
+  
+      // Create source and connect it to the context
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+  
+      // Start playing the audio
+      source.start();
+  
+      // Optionally return the source node to control playback
+      return source;
     } catch (error) {
       console.error("Failed to play audio from base64:", error);
+      return null;
     }
   };
+  
 
-  const stopAudio = async () => {
-    if (sound !== null) {
-      await sound.unloadAsync();
-      setSound(null);
-    }
-  };
 
   return (
     <View style={styles.dashboard}>
       
-      <View style={[styles.dashboardInner, styles.groupItemLayout]}>
-        <View style={[styles.groupItem, styles.groupItemBg]} />
-      </View>
       <View style={styles.topHeader}>
         <View>
           <Text style={{textAlign:'center',alignSelf:'center',fontSize: 20,padding:'1%',fontWeight:'700'}}>प्रबंधन</Text>
         </View>
         <View style={styles.notificationIcon}>
-          <Button title="Not" onPress={()=> navigation.navigate('NotificationsPage')}/>
+          <Pressable onPress={()=> navigation.navigate('NotificationsPage')}>
+            <Image source={require('../assets/notification1.png')} style={{width:30,height:30,marginLeft:'50%'}} />
+          </Pressable>
         </View>      
+      
       </View>
       <Text style={styles.whatWouldYou}>
         What would you like to do?
       </Text>
-      <View style={{flex:1,justifyContent:'center',alignItems:'center',marginTop:'50%',backgroundColor:'#10b981',borderRadius:20,width:'80%',alignSelf:'center',paddingTop:'25%'}}> 
-        <Button title="Recording" onPress={startRecording} style={styles.micFillIcon}/>
+      <View style={{flex:1,
+                    justifyContent:'center',
+                    alignItems:'center',
+                    marginTop:'50%',
+                    backgroundColor:'#aff5ed',
+                    borderRadius:20,
+                    width:'80%',
+                    alignSelf:'center',
+                    paddingTop:'28%',
+                    paddingBottom:'30%'}}> 
+        <Pressable title="Mic" onPress={startRecording} style={styles.micFillIcon}>
+          <Image source={require('../assets/mic.png')} style={{width:'80%',height:'80%',padding:'7%'}}/>
+        </Pressable>
         <Text style={[styles.tapToRecord, styles.tapToRecordClr]}>
           {isRecording ? 'Tap to stop recording' : 'Tap to record'}
         </Text>
       </View>
-      
+
+      {/* <View style={styles.buttonContainer1}> */}
         <View style={styles.buttonContainer}>
-          <Button title="Inventory" onPress={()=> navigation.navigate('Inventory')} />
-          <Button title="Camera" onPress={toggleCamera} />
-          <Button title="Settings" onPress={() => navigation.navigate('Settings')} />
+          <Pressable title="Inventory" onPress={()=> navigation.navigate('Inventory')} >
+            <Image source={require('../assets/folder.png')} style={{width:50,height:50,padding:5}}/>
+          </Pressable>
+          <Pressable title="Camera" onPress={toggleCamera} >
+            <Image source={require('../assets/camera.png')} style={{width:50,height:50,padding:5}}/>
+          </Pressable>
+          <Pressable title="Settings" onPress={() => navigation.navigate('Settings')} >
+            <Image source={require('../assets/settings.png')} style={{width:50,height:50,padding:5}}/>
+          </Pressable>
         </View>
-      
+      {/* </View> */}
     
       
       
       {isCameraVisible && (
         <Camera style={StyleSheet.absoluteFill} type={Camera.Constants.Type.back} ref={cameraRef}>
-          {/* Button overlapping on the camera view */}
-          {/* <TouchableOpacity onPress={takePicture} style={styles.captureButton}>
-            <Text style={styles.captureButtonText}>Capture</Text>
-          </TouchableOpacity> */}
+
           <View style={styles.captureButton}>
             <Button title="Capture" onPress={takePicture} color='grey' />
           </View>
@@ -319,6 +329,7 @@ const styles = StyleSheet.create({
   },
   topHeader:{
     top: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+    backgroundColor:'#d9d9d9',
     borderColor:'black',
     borderRadius:20,
     borderWidth:0.5,
@@ -340,36 +351,37 @@ const styles = StyleSheet.create({
   },
   whatWouldYou: {
     top: '10.5%',
-    left: '15%',
+    //left: '15%',
+    alignSelf:'center',
     alignItems: 'center',
     fontSize: 15,
     fontFamily: FontFamily.poppinsRegular,
     textAlign: "center",
     width: '70%',
     //height: 16,
-    fontWeight: "bold"
+    fontWeight: "bold",
+    borderColor:'black',
+    borderWidth:1,
+    borderRadius:20,
+    padding:'2%',
+    backgroundColor:Color.color1
   },
   buttonContainer: {
     flex:1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems:'center',
-    marginTop:'40%',
+    marginTop:'10%',
     width:'90%',
-    height:'50%',
+    //height:'50%',
     alignSelf:'center',
-    backgroundColor:Color.color1,
+    backgroundColor:'#aff5ed',
     borderRadius:50,
     padding:'5%',
     marginBottom:'10%',
 
   },
-  // buttonContainer1:{
-  //   flexDirection:'column',
-  //   justifyContent:'flex-end',
-  //   alignItems:'stretch',
-  //   marginTop:'100%'
-  // },
+  
   ellipseIcon: {
     top: 308,
     left: 148,
@@ -390,6 +402,7 @@ const styles = StyleSheet.create({
   tapToRecord: {
     //top: 435,
     flex:1,
+    bottom:'20%',
     //left: '28%',
     alignSelf:'center',
     fontSize: FontSize.size_l,
@@ -401,14 +414,14 @@ const styles = StyleSheet.create({
     justifyContent:'center'
   },
   dashboard: {
-    backgroundColor: Color.colorWhite,
+    backgroundColor: '#e6fff5',
     flex: 1,
     width: "100%",
     height: 844,
     overflow: "hidden",
   },
   captureButton: {
-    //backgroundColor: 'white',
+    //backgroundColor: '#e6fff5',
     borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 20,

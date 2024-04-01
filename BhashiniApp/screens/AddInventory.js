@@ -6,6 +6,8 @@ const AddInventory = ({ navigation }) => {
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
+  const [minQuantity, setMinQuantity] = useState("");
+  const [maxQuantity, setMaxQuantity] = useState("");
 
   const addItem = async () => {
     try {
@@ -13,7 +15,9 @@ const AddInventory = ({ navigation }) => {
       await axios.post("YOUR_BACKEND_URL/inventory", {
         name: itemName,
         quantity: parseInt(quantity),
-        price: parseFloat(price)
+        price: parseFloat(price),
+        min_quantity: parseInt(minQuantity),
+        max_quantity: parseInt(maxQuantity)
       });
       // Navigate back to the Inventory screen after adding the item
       navigation.goBack();
@@ -46,6 +50,22 @@ const AddInventory = ({ navigation }) => {
         onChangeText={setPrice}
         keyboardType="numeric"
         placeholder="Enter price"
+      />
+      <Text style={styles.label}>Min Quantity</Text>
+      <TextInput
+        style={styles.input}
+        value={minQuantity}
+        onChangeText={setMinQuantity}
+        keyboardType="numeric"
+        placeholder="Enter min quantity"
+      />
+      <Text style={styles.label}>Max Quantity</Text>
+      <TextInput
+        style={styles.input}
+        value={maxQuantity}
+        onChangeText={setMaxQuantity}
+        keyboardType="numeric"
+        placeholder="Enter max quantity"
       />
       <Button title="Save" onPress={addItem} />
     </View>

@@ -1,85 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
 import axios from 'axios';
-import { Notifications } from 'react-native-notifications';
 
 const NotificationsPage = () => {
- const [notifications, setNotifications] = useState([
-    { title: 'Test Notification 1', message: 'This is a test notification.' },
-    { title: 'Test Notification 2', message: 'Another test notification.' },
-    // Add more placeholder notifications as needed
- ]);
+  const [lowInventoryItems, setLowInventoryItems] = useState([]);
 
- useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        // Replace 'YOUR_API_ENDPOINT' with your actual API endpoint
-        const response = await axios.get('YOUR_API_ENDPOINT');
-        setNotifications(response.data);
-      } catch (error) {
-        console.error('Error fetching notifications:', error);
-      }
-    };
+  useEffect(() => {
+    fetchLowInventoryItems();
+  }, []);
 
-    fetchNotifications();
+  const fetchLowInventoryItems = async () => {
+    try {
+      // Fetch inventory items from the backend
+      const response = await axios.get("YOUR_BACKEND_URL/inventory");
+      const inventoryItems = response.data;
 
-    // Register for remote notifications
-    Notifications.registerRemoteNotifications();
+      // Filter items based on quantity less than min_quantity
+      const lowQuantityItems = inventoryItems.filter(item => item.quantity < item.min_quantity);
+      setLowInventoryItems(lowQuantityItems);
+    } catch (error) {
+      console.error("Error fetching low inventory items:", error);
+    }
+  };
 
-    // Listen for the remoteNotificationRegistered event to handle the new token
-    Notifications.events().registerRemoteNotificationRegistered(event => {
-      console.log('Device Token Received', event.deviceToken);
-    });
+  const renderItem = ({ item }) => (
+    <View style={styles.itemContainer}>
+      <Text style={styles.itemName}>{item.name}</Text>
+      <Text>Quantity: {item.quantity}</Text>
+      <Text>Min Quantity: {item.min_quantity}</Text>
+    </View>
+  );
 
-    // Listen for notifications received in the foreground
-    Notifications.events().registerNotificationReceivedForeground((notification, completion) => {
-      console.log('Notification Received - Foreground', notification);
-      completion({ alert: false, sound: false, badge: false });
-    });
-
-    // Listen for notifications received in the background
-    Notifications.events().registerNotificationReceivedBackground((notification, completion) => {
-      console.log('Notification Received - Background', notification);
-      completion({ alert: true, sound: true, badge: false });
-    });
-
-    // Listen for notifications opened
-    Notifications.events().registerNotificationOpened(notification => {
-      console.log('Notification opened by device user', notification);
-    });
-
- }, []);
-
- return (
+  return (
     <View style={styles.container}>
       <FlatList
-        data={notifications}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.notificationItem}>
-            <Text style={styles.notificationText}>{item.title}</Text>
-            <Text style={styles.notificationText}>{item.message}</Text>
-          </View>
-        )}
+        data={lowInventoryItems}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={<Text style={styles.header}>Low Inventory Items</Text>}
+        ListEmptyComponent={<Text>No low inventory items found</Text>}
       />
     </View>
- );
+  );
 };
 
 const styles = StyleSheet.create({
- container: {
+  container: {
     flex: 1,
     padding: 20,
- },
- notificationItem: {
-    marginBottom: 20,
+    backgroundColor: "#f0fff4", // Light green background color
+  },
+  itemContainer: {
+    backgroundColor: "#ccffeb", // Light green background color for item container
+    borderRadius: 10,
     padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
- },
- notificationText: {
-    fontSize: 16,
- },
+    marginBottom: 10,
+    alignItems: "center", // Center items horizontally
+  },
+  header: {
+    fontSize: 20,
+    marginBottom: 10,
+    fontWeight: "bold",
+  },
+  itemName: {
+    fontSize: 18,
+    marginBottom: 5,
+  },
 });
 
 export default NotificationsPage;

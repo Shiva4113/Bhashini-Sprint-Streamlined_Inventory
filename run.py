@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 from flask_cors import CORS
 from PIL import Image
-
+from pydub import AudioSegment
+import base64
 #ENVIRONMENT VARIABLES
 load_dotenv()
 
@@ -392,10 +393,41 @@ def process_audio_request():
             data = request.json
             srcLang = data.get("sourceLanguage", "")
             tgtLang = data.get("targetLanguage", "")
-            audioContent = data.get("audioContent", "")
+            audioContent = data.get("audioContent", "")#this is base64 encoded 3gpp
             # imageUri = data.get("imageUri", "")
             user_id = data.get("userId","")
+        
+        # binary_audio = base64.b64decode(audioContent)
 
+        # with open("temp.3gp","wb") as f:
+        #     f.write(binary_audio)
+        
+        # # Load the temporary 3GPP file using pydub
+        # # audio = AudioSegment.from_file("temp.3gp", format="3gp")
+        import subprocess
+
+        # Define the command as a list of arguments
+        command = ['ffmpeg', '-i', 'audio.3gp', '-c:a', 'libmp3lame', 'audio.mp3']
+
+        # Execute the command
+        try:
+            result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            print("Command executed successfully.")
+            print("Output:", result.stdout.decode('utf-8'))
+        except subprocess.CalledProcessError as e:
+            print("Command failed.")
+            print("Error:", e.stderr.decode('utf-8'))
+
+
+# Convert to MP3
+        # audio.export("output.mp3", format="mp3")
+
+        with open("audio.mp3", "rb") as f:
+            mp3data =f.read()
+            b64_encode = base64.b64encode(mp3data)
+        
+        audioContent = b64_encode
+        return{"response":audioContent}
         headers={
             "userID":userID,
             "ulcaApiKey":ulcaApiKey
@@ -440,16 +472,10 @@ def process_audio_request():
             }
 
         responseServices = requests.post(GET_SERVICE_ENDPOINT,json=langPayload,headers=headers)
-
-        
-        if audioContent:
-            return jsonify({"response":"received audio"}), 200
-    except Exception as e:
-        return {"error":str(e)},404
         
     finally:
         
-        asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us
+        asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us 
         nmtServiceId = responseServices.json()["pipelineResponseConfig"][1]["config"][0]["serviceId"]#this correctly gives the nmt service ID to us
         ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
         ocrServiceId = "bhashini-anuvaad-tesseract-ocr-printed-line-all"#this is the only given ocr service ID

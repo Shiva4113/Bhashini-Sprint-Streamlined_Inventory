@@ -1,3 +1,5 @@
+//this is for the signup validation....ensure the connection with atlas
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
