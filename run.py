@@ -15,6 +15,8 @@ from PIL import Image
 from pydub import AudioSegment
 import base64
 import os
+import io
+
 
 #ENVIRONMENT VARIABLES
 load_dotenv()
@@ -234,10 +236,10 @@ def process_instr(instruction, userId):
 
     return reply
 
-def process_img():
+def process_img(imgUri):
     
-    imgPath = Path("./images/3onions.jpeg")
-    img = Image.open(imgPath)
+    decoded_image = io.BytesIO(base64.b64decode(imgUri))
+    img = Image.open(decoded_image)
 
     prompt = ['''how many of each object is present in the image?
                  can you give me the output as 
@@ -249,6 +251,7 @@ def process_img():
     responseGen = modelVision.generate_content(prompt)
     cmdContent = responseGen.text.upper().split(';')
     return cmdContent
+
 
 #HANDLE BHASHINI TASKS
 def process_asr_nmt(audioContent,srcLang,tgtLang,asrServiceId,nmtServiceId):
@@ -500,9 +503,11 @@ def process_image_request():
     if request.method == "POST":
         credentials = request.json
         userId = credentials.get("userId", "")
+        img = credentials.get("imageUri","")
+        
         if not isinstance(userId, ObjectId):
             userId = ObjectId(userId)
-        cmdContent = process_img()
+        cmdContent = process_img(img)
         dbOperation = cmdContent[0].strip()
         itemNames = list(map(str,cmdContent[2].strip('[').strip(']').split(',')))
         responseDB = dbInv.find_one({"user_id": userId})

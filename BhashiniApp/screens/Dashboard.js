@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
   const [sound,setSound] = useState(null);
+  
 
   const cameraRef = useCallback(ref => {
     if (ref !== null) {
