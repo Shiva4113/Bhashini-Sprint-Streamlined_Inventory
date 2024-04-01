@@ -14,6 +14,8 @@ from flask_cors import CORS
 from PIL import Image
 from pydub import AudioSegment
 import base64
+import os
+
 #ENVIRONMENT VARIABLES
 load_dotenv()
 
@@ -122,17 +124,20 @@ def process_instr(instruction, userId):
     examples :  2 Onions 3 Bananas sold : REMOVE;[2,3];[Onion, Banana]
 	            2 Apple sold : REMOVE;[2];[Apple]
                 sold 3 bananas and 2 onions : REMOVE;[3,2];[Banana, Onion]
-
+                2 Apples were sold: REMOVE;[2];[Apple]
 	            3 Mangos received : INSERT;[3];[Mango] 
 	            4 Potato Chips obtained : INSERT;[4];[Potato Chips] 
 
 	What is the price of Banana? : STATUS;PRICE;[Banana]
 	How many apples are left? : STATUS;QUANTITY;[Apple]
     How many apples and bananas are there?: STATUS;QUANTITY;[Apple, Banana]
+    How many Onions are there? : STATUS;QUANTITY;[Onion]
+    Strictly follow the output format of STATUS;PRICE/QUANTITY/[ItemName] or INSERT/REMOVE;[QUANTITY];[ItemNames]
     Keep the item quantities in one list and the itemNames in another list, dont separate them''')
     
     
     cmdContent = responseGen.text.upper().split(';')
+    print(instruction)
     # return {"response":cmdContent}
     # itemQtys = list(map(int,cmdContent[1].strip('[').strip(']').split(',')))
     itemNames = list(map(str,cmdContent[2].strip('[').strip(']').split(',')))
@@ -394,40 +399,25 @@ def process_audio_request():
             srcLang = data.get("sourceLanguage", "")
             tgtLang = data.get("targetLanguage", "")
             audioContent = data.get("audioContent", "")#this is base64 encoded 3gpp
+            audioContent = audioContent[23:]
             # imageUri = data.get("imageUri", "")
             user_id = data.get("userId","")
-        
-        # binary_audio = base64.b64decode(audioContent)
+    # print(audioContent[23:])
+    # return {"response":audioContent}
+        decoded_content = base64.b64decode(audioContent)
 
-        # with open("temp.3gp","wb") as f:
-        #     f.write(binary_audio)
-        
-        # # Load the temporary 3GPP file using pydub
-        # # audio = AudioSegment.from_file("temp.3gp", format="3gp")
-        import subprocess
+        with open("./decodedaudio.3gp", "wb") as audio_file:
+            audio_file.write(decoded_content)
 
-        # Define the command as a list of arguments
-        command = ['ffmpeg', '-i', 'audio.3gp', '-c:a', 'libmp3lame', 'audio.mp3']
+        os.system('ffmpeg -i ./decodedaudio.3gp ./audio.mp3')
 
-        # Execute the command
-        try:
-            result = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            print("Command executed successfully.")
-            print("Output:", result.stdout.decode('utf-8'))
-        except subprocess.CalledProcessError as e:
-            print("Command failed.")
-            print("Error:", e.stderr.decode('utf-8'))
+        file = open("./audio.mp3","rb")
+        fileContent = file.read()
+        file.close()
+        newAudio = base64.b64encode(fileContent).decode('ascii')
+        os.remove('./audio.mp3')
+        os.remove("./decodedaudio.3gp")
 
-
-# Convert to MP3
-        # audio.export("output.mp3", format="mp3")
-
-        with open("audio.mp3", "rb") as f:
-            mp3data =f.read()
-            b64_encode = base64.b64encode(mp3data)
-        
-        audioContent = b64_encode
-        return{"response":audioContent}
         headers={
             "userID":userID,
             "ulcaApiKey":ulcaApiKey
@@ -472,7 +462,10 @@ def process_audio_request():
             }
 
         responseServices = requests.post(GET_SERVICE_ENDPOINT,json=langPayload,headers=headers)
-        
+    
+    except Exception as e:
+        return jsonify({"error":e})
+    
     finally:
         
         asrServiceId = responseServices.json()["pipelineResponseConfig"][0]["config"][0]["serviceId"]#this correctly gives the asr service ID to us 
@@ -480,8 +473,8 @@ def process_audio_request():
         ttsServiceId = responseServices.json()["pipelineResponseConfig"][2]["config"][0]["serviceId"]#this correctly gives the tts service ID to us
         ocrServiceId = "bhashini-anuvaad-tesseract-ocr-printed-line-all"#this is the only given ocr service ID
 
-        responseAsrNmt = process_asr_nmt(audioContent=audioContent,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
-
+        responseAsrNmt = process_asr_nmt(audioContent=newAudio,srcLang=srcLang,tgtLang=tgtLang,asrServiceId=asrServiceId,nmtServiceId=nmtServiceId)
+        # print(responseAsrNmt)
         getCmd= responseAsrNmt["pipelineResponse"][1]["output"][0]["target"]
         
         
@@ -490,8 +483,11 @@ def process_audio_request():
         # return responseLLM
             
         responseNmtTts = process_nmt_tts(textContent = responseLLM["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
+        outputAudio = responseNmtTts["pipelineResponse"][1]["audio"][0]["audioContent"]
 
-        return responseNmtTts
+
+
+        return jsonify({"response":outputAudio}),200
         # responseocr = process_ocr(srcLang=srcLang,imgUri="https://dhruvacentrali0960249713.blob.core.windows.net/haridas/Hindi-Bhasha.jpg",ocrServiceId=ocrServiceId)
         #return {"op":responseocr}
         

@@ -19,7 +19,7 @@ const LanguageSelectionScreen = ({ navigation }) => {
   const sendSelectedLanguageToBackend = async () => {
     try {
       // Assuming you have a backend endpoint to receive the selected language
-      const response = await axios.post('YOUR_BACKEND_ENDPOINT', { language: selectedLanguage });
+      const response = await axios.post('http://192.168.68.104:5000/changelanguage', { language: selectedLanguage });
       console.log('Selected language sent to backend:', selectedLanguage);
       console.log('Response from backend:', response.data);
       // Optionally, you can navigate back to the Settings screen after sending the language

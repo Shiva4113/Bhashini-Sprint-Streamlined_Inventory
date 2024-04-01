@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable } from "react-native";
 import { Color, Border, FontFamily, FontSize } from "../GlobalStyles";
 import { Audio } from "expo-av";
@@ -7,7 +7,9 @@ import { Camera } from 'expo-camera';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store'
-
+// import { Storage } from "react-native-firebase/storage";
+import AudioRecord from "react-native-audio-record"
+import { PermissionsAndroid } from 'react-native';
 import { useCallback } from "react";
 
 const Dashboard = () => {
@@ -15,6 +17,7 @@ const Dashboard = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
+  const [sound,setSound] = useState(null);
 
   const cameraRef = useCallback(ref => {
     if (ref !== null) {
@@ -56,7 +59,7 @@ const Dashboard = () => {
     }
   };
   
-
+  
   const startRecording = async () => {
     try {
       const { status } = await Audio.requestPermissionsAsync();
@@ -66,7 +69,26 @@ const Dashboard = () => {
       }
       if (!isRecording) {
         const recordingInstance = new Audio.Recording();
-        await recordingInstance.prepareToRecordAsync(Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY, Audio.AndroidAudioEncoder = "", Audio.AndroidOutputFormat = "mp3");
+        await recordingInstance.prepareToRecordAsync({
+          android: {
+            extension: '.mp3', // Specify the extension as MP3
+            outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4, // Use MPEG-4 format
+            audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC, // Use AAC encoder
+            sampleRate: 44100,
+            numberOfChannels: 2,
+            bitRate: 128000,
+          },
+          ios: {
+            extension: '.m4a', // iOS typically uses M4A format
+            audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
+            sampleRate: 44100,
+            numberOfChannels: 2,
+            bitRate: 128000,
+            linearPCMBitDepth: 16,
+            linearPCMIsBigEndian: false,
+            linearPCMIsFloat: false,
+          },
+        });
         await recordingInstance.startAsync();
         setRecording(recordingInstance);
         setIsRecording(true);
@@ -83,10 +105,14 @@ const Dashboard = () => {
       if (recording) {
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
+        console.log(uri)
         const base64 = await convertAudioToBase64(uri);
+        console.log(base64)
         sendAudioToBackend(base64);
         setRecording(null);
         setIsRecording(false);
+        // playAudio()
+        // stopAudio()
       }
     } catch (error) {
       console.error('Failed to stop recording', error);
@@ -108,60 +134,119 @@ const Dashboard = () => {
       throw error;
     }
   };
-
   const sendAudioToBackend = async (base64Audio) => {
     try {
-      console.log(base64Audio)
-      let userID = await SecureStore.getItemAsync("userID");
-      const response = await fetch('http://10.1.3.186:5000/processaudio', {
-        method: 'POST',
-        headers: {
-           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-           sourceLanguage: "hi",
-           targetLanguage: "en",
-           audioContent: base64Audio,
-           userId: userID
-        })
-       });
-       
-      console.log('Audio sent successfully', response);
-      playAudioFromBase64(base64Audio);
-    } catch (error) {
-      console.error('Failed to send audio to backend!!', error);
-    }
-  };
+        let userID = await SecureStore.getItemAsync("userID").catch(error => {
+            console.error("Error retrieving userID:", error);
+            throw error; // Rethrow the error to be caught by the outer try-catch
+        });
 
-  const playAudioFromBase64 = async (base64String) => {
-    try {
-      // Decode base64 string to binary data
-      const binaryData = atob(base64String);
-      const byteArray = new Uint8Array(binaryData.length);
-      for (let i = 0; i < binaryData.length; i++) {
-        byteArray[i] = binaryData.charCodeAt(i);
-      }
-  
-      // Create audio context and decode audio data
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(byteArray.buffer);
-  
-      // Create source and connect it to the context
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-  
-      // Start playing the audio
-      source.start();
-  
-      // Optionally return the source node to control playback
-      return source;
+        const response = await fetch('http://192.168.68.104:5000/processaudio', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sourceLanguage: "hi",
+                targetLanguage: "en",
+                audioContent: base64Audio,
+                userId: userID
+            })
+        }).catch(error => {
+            console.error("Error sending audio to backend:", error);
+            throw error; // Rethrow the error to be caught by the outer try-catch
+        });
+
+        // Assuming you want to do something with the response, like checking the status
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Process the response as needed
+        // For example, if you expect JSON in the response:
+        const data = await response.json();
+        console.log(data);
+        playAudio(data.response)
+        stopAudio()
     } catch (error) {
-      console.error("Failed to play audio from base64:", error);
-      return null;
+        console.error("An error occurred:", error);
+        // Handle the error as appropriate for your application
     }
-  };
+};
+
+  // const sendAudioToBackend = async (base64Audio) => {
+  //   try {
+  //     // console.log(base64Audio)
+  //     let userID = await SecureStore.getItemAsync("userID");
+  //     const response = await fetch('http://192.168.68.104:5000/processaudio', {
+  //       method: 'POST',
+  //       headers: {
+  //          'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //          sourceLanguage: "hi",
+  //          targetLanguage: "en",
+  //          audioContent: base64Audio,
+  //          userId: userID
+  //       })
+  //      }
+  //      );
+       
+  //     console.log('Audio sent successfully', response);
+      
+  //     // playAudioFromBase64(base64Audio);
+  //   } catch (error) {
+  //     console.error('Failed to send audio to backend!!', error);
+  //   }
+  // };
+
+  // const playAudioFromBase64 = async (base64String) => {
+  //   try {
+  //     // Decode base64 string to binary data
+  //     const binaryData = atob(base64String);
+  //     const byteArray = new Uint8Array(binaryData.length);
+  //     for (let i = 0; i < binaryData.length; i++) {
+  //       byteArray[i] = binaryData.charCodeAt(i);
+  //     }
   
+  //     // Create audio context and decode audio data
+  //     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  //     const audioBuffer = await audioContext.decodeAudioData(byteArray.buffer);
+  
+  //     // Create source and connect it to the context
+  //     const source = audioContext.createBufferSource();
+  //     source.buffer = audioBuffer;
+  //     source.connect(audioContext.destination);
+  
+  //     // Start playing the audio
+  //     source.start();
+  
+  //     // Optionally return the source node to control playback
+  //     return source;
+  //   } catch (error) {
+  //     console.error("Failed to play audio from base64:", error);
+  //     return null;
+  //   }
+  // };
+  
+  const playAudio = async (base64String) => {
+    if (sound) {
+      await sound.unloadAsync();
+      setSound(null);
+    }
+
+    const uri = `data:audio/mp3;base64,${base64String}`;
+    const { sound: newSound } = await Audio.Sound.createAsync({ uri });
+    setSound(newSound);
+    await newSound.playAsync();
+ };
+
+ const stopAudio = async () => {
+    if (sound) {
+      await sound.stopAsync();
+      setSound(null);
+    }
+ };
 
 
   return (

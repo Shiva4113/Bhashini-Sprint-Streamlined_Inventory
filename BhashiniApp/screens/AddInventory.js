@@ -12,7 +12,7 @@ const AddInventory = ({ navigation }) => {
   const addItem = async () => {
     try {
       // Assuming your backend endpoint for adding items is "/inventory"
-      await axios.post("YOUR_BACKEND_URL/inventory", {
+      await axios.post("http://192.168.68.104:5000/addinv", {
         name: itemName,
         quantity: parseInt(quantity),
         price: parseFloat(price),

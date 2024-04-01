@@ -13,7 +13,7 @@ const EditItem = ({ route }) => {
   const handleSave = async () => {
     try {
       // Make a POST request to your backend API endpoint to save the edited item
-      const response = await axios.post('YOUR_BACKEND_URL/editItem', editedItem);
+      const response = await axios.post('http://192.168.68.104:5000/editItem', editedItem);
       console.log('Item edited successfully:', response.data);
       // Handle success response from the backend
     } catch (error) {

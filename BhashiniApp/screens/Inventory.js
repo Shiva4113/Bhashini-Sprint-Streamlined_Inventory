@@ -15,7 +15,7 @@ const Inventory = ({ navigation }) => {
     let userID = await SecureStore.getItemAsync("userID");
     console.log("uid:", userID);
 
-    const response = await fetch("http://10.1.3.186:5000/fetchinv", {
+    const response = await fetch("http://192.168.68.104:5000/fetchinv", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
