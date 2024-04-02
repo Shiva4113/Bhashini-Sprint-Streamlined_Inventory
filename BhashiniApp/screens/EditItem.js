@@ -1,61 +1,136 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
-import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
 
 const EditItem = ({ route }) => {
-  const { item } = route.params;
-  const [editedItem, setEditedItem] = useState({
-    ...item,
-    min_quantity: item.min_quantity || 0, // Default to 0 if min_quantity is undefined
-    max_quantity: item.max_quantity || 0, // Default to 0 if max_quantity is undefined
-  });
+ const { item } = route.params;
+ const [editedItem, setEditedItem] = useState({
+    name: item.item_name || "",
+    quantity: item.item_qty || 0,
+    price: item.item_price || 0.0,
+    min_quantity: item.item_min || 0,
+    max_quantity: item.item_max || 0,
+ });
 
-  const handleSave = async () => {
+ useEffect(() => {
+    const fetchAndSetItems = async () => {
+      try {
+        const userID = await SecureStore.getItemAsync("userID");
+        const itemName = await SecureStore.getItemAsync("itemName");
+
+        console.log(userID);
+
+        // Now that we have userID and itemName, we can proceed with fetching items
+        await fetchItems(userID, itemName);
+      } catch (error) {
+        console.error('Error fetching userID or itemName:', error);
+      }
+    };
+
+    fetchAndSetItems();
+ }, []);
+
+ const fetchItems = async (userID, itemName) => {
     try {
-      // Make a POST request to your backend API endpoint to save the edited item
-      const response = await axios.post('http://192.168.68.104:5000/editItem', editedItem);
-      console.log('Item edited successfully:', response.data);
-      // Handle success response from the backend
+      const response = await fetch('http://10.1.1.58:5000/fetchitem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ "userId": userID, "itemName": itemName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch item');
+      }
+
+      const responseData = await response.json();
+      if (responseData.length > 0) {
+        const fetchedItem = responseData[0];
+        setEditedItem({
+          name: fetchedItem.item_name,
+          quantity: fetchedItem.item_qty,
+          min_quantity: fetchedItem.item_min,
+          max_quantity: fetchedItem.item_max,
+          price: fetchedItem.item_price
+        });
+      } else {
+        console.warn('No item data received.');
+      }
+    } catch (error) {
+      console.error('Error fetching item:', error);
+    }
+ };
+
+ const handleSave = async () => {
+    try {
+      const userID = await SecureStore.getItemAsync("userID");
+      const itemName = await SecureStore.getItemAsync("itemName");
+
+      console.log(userID);
+
+      const response = await fetch('http://10.1.1.58:5000/edititem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "userId": userID,
+          "itemName": itemName,
+          "itemQty": editedItem.quantity,
+          "itemMin": editedItem.min_quantity,
+          "itemMax": editedItem.max_quantity,
+          "itemPrice": editedItem.price
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to edit item');
+      }
+
+      const responseData = await response.json();
+      console.log('Item edited successfully:', responseData);
+      
+
     } catch (error) {
       console.error('Error editing item:', error);
-      // Handle error
     }
-  };
+ };  
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Name:</Text>
       <TextInput
         style={styles.input}
-        value={editedItem.name}
+        value={editedItem.name ?? ''}
         onChangeText={(text) => setEditedItem({ ...editedItem, name: text })}
       />
       <Text style={styles.label}>Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={editedItem.quantity.toString()}
-        onChangeText={(text) => setEditedItem({ ...editedItem, quantity: parseInt(text) })}
+        value={(editedItem.quantity ?? 0).toString()}
+        onChangeText={(text) => setEditedItem({ ...editedItem, quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Min Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={editedItem.min_quantity.toString()}
-        onChangeText={(text) => setEditedItem({ ...editedItem, min_quantity: parseInt(text) })}
+        value={(editedItem.min_quantity ?? 0).toString()}
+        onChangeText={(text) => setEditedItem({ ...editedItem, min_quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Max Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={editedItem.max_quantity.toString()}
-        onChangeText={(text) => setEditedItem({ ...editedItem, max_quantity: parseInt(text) })}
+        value={(editedItem.max_quantity ?? 100).toString()}
+        onChangeText={(text) => setEditedItem({ ...editedItem, max_quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Price:</Text>
       <TextInput
         style={styles.input}
-        value={editedItem.price.toString()}
-        onChangeText={(text) => setEditedItem({ ...editedItem, price: parseFloat(text) })}
+        value={(editedItem.price ?? 0.0).toString()}
+        onChangeText={(text) => setEditedItem({ ...editedItem, price: text })}
         keyboardType="numeric"
       />
       <Button title="Save" onPress={handleSave} />

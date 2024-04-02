@@ -33,7 +33,7 @@ export default function Signup() {
         language: language,
       };
       const response = await fetch(
-        `http://192.168.68.104:5000/signup`,
+        `http://10.1.1.58:5000/signup`,
         {
           method: "POST",
           headers: {

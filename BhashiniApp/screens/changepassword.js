@@ -17,7 +17,7 @@ const ChangePassword = () => {
     let userID = await SecureStore.getItemAsync("userID");
     console.log("user id from secure store:",userID)
     try {
-      const response = await fetch("http://192.168.68.104:5000/changepassword", {
+      const response = await fetch("http://10.1.1.58:5000/changepassword", {
          method: 'POST',
          headers: {
            'Content-Type': 'application/json',

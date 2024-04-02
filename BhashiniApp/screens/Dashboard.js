@@ -1,5 +1,5 @@
 import React, { useState,useEffect } from "react";
-import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable } from "react-native";
+import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable, Alert } from "react-native";
 import { Color, Border, FontFamily, FontSize } from "../GlobalStyles";
 import { Audio } from "expo-av";
 import { useNavigation } from '@react-navigation/native';
@@ -10,7 +10,7 @@ import * as SecureStore from 'expo-secure-store'
 // import { Storage } from "react-native-firebase/storage";
 import AudioRecord from "react-native-audio-record"
 import { PermissionsAndroid } from 'react-native';
-import { useCallback } from "react";
+import { useCallback } from "react"; 
 
 const Dashboard = () => {
   const [recording, setRecording] = useState(null);
@@ -18,6 +18,8 @@ const Dashboard = () => {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
   const [sound,setSound] = useState(null);
+
+  
 
   const cameraRef = useCallback(ref => {
     if (ref !== null) {
@@ -87,8 +89,8 @@ const Dashboard = () => {
             linearPCMBitDepth: 16,
             linearPCMIsBigEndian: false,
             linearPCMIsFloat: false,
-          },
-        });
+         },
+  });
         await recordingInstance.startAsync();
         setRecording(recordingInstance);
         setIsRecording(true);
@@ -138,17 +140,21 @@ const Dashboard = () => {
     try {
         let userID = await SecureStore.getItemAsync("userID").catch(error => {
             console.error("Error retrieving userID:", error);
-            throw error; // Rethrow the error to be caught by the outer try-catch
+            throw error;
         });
-
-        const response = await fetch('http://192.168.68.104:5000/processaudio', {
+        let srcLang = await SecureStore.getItemAsync("language").catch(error => {
+          console.error("Error retrieving userID:", error);
+          throw error; 
+      });
+      let tgtLang = "en" // defaulting this to english cuz gemini works on english
+        const response = await fetch('http://10.1.1.58:5000/processaudio', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                sourceLanguage: "hi",
-                targetLanguage: "en",
+                sourceLanguage: srcLang,
+                targetLanguage: tgtLang,
                 audioContent: base64Audio,
                 userId: userID
             })

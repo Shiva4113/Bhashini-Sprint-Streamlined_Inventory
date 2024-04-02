@@ -4,8 +4,8 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
 const Inventory = ({ navigation }) => {
- const [inventoryItems, setInventoryItems] = useState([]);
-
+const [inventoryItems, setInventoryItems] = useState([]);
+SecureStore.deleteItemAsync("itemName");
  useEffect(() => {
     fetchInventoryItems();
  }, []);
@@ -15,7 +15,7 @@ const Inventory = ({ navigation }) => {
     let userID = await SecureStore.getItemAsync("userID");
     console.log("uid:", userID);
 
-    const response = await fetch("http://192.168.68.104:5000/fetchinv", {
+    const response = await fetch("http://10.1.1.58:5000/fetchinv", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -43,7 +43,9 @@ const Inventory = ({ navigation }) => {
 
 
 const renderItem = (item) => (
-  <TouchableOpacity onPress={() => navigation.navigate("EditItem", { item })}>
+  <TouchableOpacity onPress={() => {console.log(item.item_name);
+  navigation.navigate("EditItem", { item });
+  SecureStore.setItemAsync("itemName",item.item_name)}}>
     <View style={styles.itemContainer}>
       <Text style={styles.itemName}>{item.item_name}</Text>
       <Text>Quantity: {item.item_qty}</Text>
@@ -54,7 +56,7 @@ const renderItem = (item) => (
         
       )}
       <Text>Min: {item.item_min}</Text>
-      <Text>Mix: {item.item_max}</Text>
+      <Text>Max: {item.item_max}</Text>
     </View>
   </TouchableOpacity>
 );
@@ -67,7 +69,8 @@ const renderItem = (item) => (
       </ScrollView>
       <Button
         title="Add Item"
-        onPress={() => navigation.navigate("AddItem")}
+        onPress={() => {
+          navigation.navigate("AddItem")}}
       />
     </View>
  );
