@@ -845,19 +845,21 @@ def edit_item():
             if not isinstance(userId, ObjectId):
                 userId = ObjectId(userId)
 
-        
+        # return jsonify({"message":str(userId)}),200
         result = dbInv.update_one(
             {"user_id": userId, "items.item_name": itemName},
             {"$set": {
                 "items.$.item_qty": itemQty,
-                "items.$.item_price": itemPrice,
+                "items.$.item_price": float(itemPrice),
                 "items.$.item_min": itemMin,
                 "items.$.item_max": itemMax
             }}
         )
 
-        if result.modified_count>=0:
-            return jsonify({"message": "Item updated successfully"}), 200
+        if result.modified_count>0:
+            return jsonify({"message": "Item updated successfully","userId":str(userId),"itemName":itemName,"itemPrice":itemPrice,"itemMax":itemMax,"itemMin":itemMin,"itemQty":itemQty}), 200
+        else:
+            return jsonify({"message":"No changes made","itemName":itemName,"itemPrice":itemPrice,"itemMax":itemMax,"itemMin":itemMin,"itemQty":itemQty})
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ const renderItem = (item) => (
         
       )}
       <Text>Min: {item.item_min}</Text>
-      <Text>Mix: {item.item_max}</Text>
+      <Text>Max: {item.item_max}</Text>
     </View>
   </TouchableOpacity>
 );

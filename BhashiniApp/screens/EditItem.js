@@ -1,53 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
-import * as SecureStore from 'expo-secure-store'
+import * as SecureStore from 'expo-secure-store';
 
-let itemName = SecureStore.getItemAsync("itemName");
-let userID = SecureStore.getItemAsync("userID");
-console.log()
 const EditItem = ({ route }) => {
-  const { item } = route.params;
-  const [editedItem, setEditedItem] = useState({
-    name : item.item_name || "",
-    quantity : item.item_qty || 0,
-    price : item.item_price || 0.0,
-    min_quantity: item.item_min || 0, 
-    max_quantity: item.item_max || 0, 
-  });
+ const { item } = route.params;
+ const [editedItem, setEditedItem] = useState({
+    name: item.item_name || "",
+    quantity: item.item_qty || 0,
+    price: item.item_price || 0.0,
+    min_quantity: item.item_min || 0,
+    max_quantity: item.item_max || 0,
+ });
 
-  const handleSave = async () => {
+ useEffect(() => {
+    const fetchAndSetItems = async () => {
+      try {
+        const userID = await SecureStore.getItemAsync("userID");
+        const itemName = await SecureStore.getItemAsync("itemName");
+
+        console.log(userID);
+
+        // Now that we have userID and itemName, we can proceed with fetching items
+        await fetchItems(userID, itemName);
+      } catch (error) {
+        console.error('Error fetching userID or itemName:', error);
+      }
+    };
+
+    fetchAndSetItems();
+ }, []);
+
+ const fetchItems = async (userID, itemName) => {
     try {
-       const response = await fetch('http://192.168.68.104:5000/edititem', {
-         method: 'POST',
-         headers: {
-           'Content-Type': 'application/json',
-         },
-         body: JSON.stringify({
-           "userId": userID,
-           "itemName": itemName,
-           "itemQty": editedItem.quantity, 
-           "itemMin": editedItem.min_quantity,
-           "itemMax": editedItem.max_quantity, 
-           "itemPrice": editedItem.price
-         }),
-       });
-       
-       if (!response.ok) {
-         throw new Error('Failed to edit item');
-       }
-   
-       const responseData = await response.json();
-       console.log('Item edited successfully:', responseData);
-       
-    } catch (error) {
-       console.error('Error editing item:', error);
-    }
-   };
-   
-
-  const fetchItems = async () => {
-    try {
-
       const response = await fetch('http://10.1.1.58:5000/fetchitem', {
         method: 'POST',
         headers: {
@@ -55,11 +39,11 @@ const EditItem = ({ route }) => {
         },
         body: JSON.stringify({ "userId": userID, "itemName": itemName }),
       });
-  
+
       if (!response.ok) {
         throw new Error('Failed to fetch item');
       }
-  
+
       const responseData = await response.json();
       if (responseData.length > 0) {
         const fetchedItem = responseData[0];
@@ -76,8 +60,42 @@ const EditItem = ({ route }) => {
     } catch (error) {
       console.error('Error fetching item:', error);
     }
-  };
-  
+ };
+
+ const handleSave = async () => {
+    try {
+      const userID = await SecureStore.getItemAsync("userID");
+      const itemName = await SecureStore.getItemAsync("itemName");
+
+      console.log(userID);
+
+      const response = await fetch('http://10.1.1.58:5000/edititem', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "userId": userID,
+          "itemName": itemName,
+          "itemQty": editedItem.quantity,
+          "itemMin": editedItem.min_quantity,
+          "itemMax": editedItem.max_quantity,
+          "itemPrice": editedItem.price
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to edit item');
+      }
+
+      const responseData = await response.json();
+      console.log('Item edited successfully:', responseData);
+      
+
+    } catch (error) {
+      console.error('Error editing item:', error);
+    }
+ };  
 
   return (
     <View style={styles.container}>
@@ -90,28 +108,28 @@ const EditItem = ({ route }) => {
       <Text style={styles.label}>Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={(editedItem.quantity ?? '').toString()}
+        value={(editedItem.quantity ?? 0).toString()}
         onChangeText={(text) => setEditedItem({ ...editedItem, quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Min Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={(editedItem.min_quantity ?? '').toString()}
+        value={(editedItem.min_quantity ?? 0).toString()}
         onChangeText={(text) => setEditedItem({ ...editedItem, min_quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Max Quantity:</Text>
       <TextInput
         style={styles.input}
-        value={(editedItem.max_quantity ?? '').toString()}
+        value={(editedItem.max_quantity ?? 100).toString()}
         onChangeText={(text) => setEditedItem({ ...editedItem, max_quantity: text })}
         keyboardType="numeric"
       />
       <Text style={styles.label}>Price:</Text>
       <TextInput
         style={styles.input}
-        value={(editedItem.price ?? '').toString()}
+        value={(editedItem.price ?? 0.0).toString()}
         onChangeText={(text) => setEditedItem({ ...editedItem, price: text })}
         keyboardType="numeric"
       />

@@ -1,5 +1,5 @@
 import React, { useState,useEffect } from "react";
-import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable } from "react-native";
+import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable, Alert } from "react-native";
 import { Color, Border, FontFamily, FontSize } from "../GlobalStyles";
 import { Audio } from "expo-av";
 import { useNavigation } from '@react-navigation/native';
@@ -10,7 +10,7 @@ import * as SecureStore from 'expo-secure-store'
 // import { Storage } from "react-native-firebase/storage";
 import AudioRecord from "react-native-audio-record"
 import { PermissionsAndroid } from 'react-native';
-import { useCallback } from "react";
+import { useCallback } from "react"; 
 
 const Dashboard = () => {
   const [recording, setRecording] = useState(null);
@@ -18,6 +18,7 @@ const Dashboard = () => {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
   const [sound,setSound] = useState(null);
+
   
 
   const cameraRef = useCallback(ref => {
@@ -88,8 +89,8 @@ const Dashboard = () => {
             linearPCMBitDepth: 16,
             linearPCMIsBigEndian: false,
             linearPCMIsFloat: false,
-          },
-        });
+         },
+  });
         await recordingInstance.startAsync();
         setRecording(recordingInstance);
         setIsRecording(true);
