@@ -28,7 +28,7 @@ export default function Login() {
         password: password,
       };
 
-      const response = await fetch("http://192.168.68.104:5000/login", {
+      const response = await fetch("http://10.1.1.58:5000/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -40,8 +40,10 @@ export default function Login() {
         const data = await response.json();
         console.log(data);
         await SecureStore.setItemAsync("userID", data.user_id);
+        await SecureStore.setItemAsync("language",data.language)
         let userID = await SecureStore.getItemAsync("userID");
-        console.log("From secure store:", userID);
+        let language = await SecureStore.getItemAsync("language");
+        console.log("From secure store:", userID,language);
         navigation.navigate("Dashboard");
       } else {
         const errorData = await response.json();

@@ -139,17 +139,21 @@ const Dashboard = () => {
     try {
         let userID = await SecureStore.getItemAsync("userID").catch(error => {
             console.error("Error retrieving userID:", error);
-            throw error; // Rethrow the error to be caught by the outer try-catch
+            throw error;
         });
-
-        const response = await fetch('http://192.168.68.104:5000/processaudio', {
+        let srcLang = await SecureStore.getItemAsync("language").catch(error => {
+          console.error("Error retrieving userID:", error);
+          throw error; 
+      });
+      let tgtLang = "en" // defaulting this to english cuz gemini works on english
+        const response = await fetch('http://10.1.1.58:5000/processaudio', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                sourceLanguage: "hi",
-                targetLanguage: "en",
+                sourceLanguage: srcLang,
+                targetLanguage: tgtLang,
                 audioContent: base64Audio,
                 userId: userID
             })

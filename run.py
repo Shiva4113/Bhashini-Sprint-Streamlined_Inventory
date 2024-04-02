@@ -128,12 +128,16 @@ def process_instr(instruction, userId):
                 sold 3 bananas and 2 onions : REMOVE;[3,2];[Banana, Onion]
                 2 Apples were sold: REMOVE;[2];[Apple]
 	            3 Mangos received : INSERT;[3];[Mango] 
-	            4 Potato Chips obtained : INSERT;[4];[Potato Chips] 
-
+	            4 Potato Chips obtained : INSERT;[4];[Potato Chips]
+                I got one hundred carrots: INSERT;[100];[Carrot] 
+                I gave 3 carrots: REMOVE;[3];[CARROT]
+    examples:
 	What is the price of Banana? : STATUS;PRICE;[Banana]
 	How many apples are left? : STATUS;QUANTITY;[Apple]
     How many apples and bananas are there?: STATUS;QUANTITY;[Apple, Banana]
     How many Onions are there? : STATUS;QUANTITY;[Onion]
+    How many Mangoes do I have? : STATUS;QUANTITY;[Mango]
+    How many 
     Strictly follow the output format of STATUS;PRICE/QUANTITY/[ItemName] or INSERT/REMOVE;[QUANTITY];[ItemNames]
     Keep the item quantities in one list and the itemNames in another list, dont separate them''')
     
@@ -649,6 +653,7 @@ def login():
         user = dbUserAuth.find_one({"username": username})
         if user:
             user_id = user["_id"]
+            language = user["language"]
         else:
             return jsonify({"error":"User not found","user_id":""}), 404
         if user:
@@ -656,7 +661,8 @@ def login():
             if checkpw(pwd.encode('utf-8'),userPwd):
 
                 return jsonify({"message": "Login successful",
-                                "user_id":str(user_id)}), 200
+                                "user_id":str(user_id),
+                                "language":language}), 200
             else:
                 return jsonify({"error": "Incorrect password"}), 401
         else:
@@ -769,6 +775,90 @@ def get_profile():
 
         if user:
             return jsonify({"username":user["username"],"email":user["email"],"mobile":user["mobile_no"]}),200   
+
+@app.route('/addinv', methods=['POST'])
+def process_add_inv():
+    if request.method == 'POST':
+        data = request.json
+        itemName = data.get("itemName", "")
+        itemQty = data.get("itemQty", "")
+        itemPrice = data.get("itemPrice", "")
+        itemMin = data.get("itemMin", "")
+        itemMax = data.get("itemMax", "")
+        userId = data.get("userId", "")
+
+    if userId:
+        if not isinstance(userId, ObjectId):
+            userId = ObjectId(userId)
+
+    responseDB = dbInv.find_one({"user_id": userId})
+
+    if responseDB:
+        items = responseDB.get("items", [])
+        for item in items:
+            if item["item_name"] == itemName:
+                return jsonify({"response": "Item already exists with the same name. Unable to add."}), 400
+
+    dbInv.update_one(
+        {"user_id": userId},
+        {"$push": {"items": {"item_name": itemName, "item_qty": itemQty, "item_min": itemMin, "item_max": itemMax,
+                             "item_price": itemPrice}}}
+    )
+
+    return jsonify({"response": "Successfully added item!"}), 200
+
+
+@app.route('/fetchitem', methods=['POST'])
+def fetch_item():
+    if request.method == 'POST':
+        data = request.json
+        userId = data.get("userId", "")
+        itemName = data.get("itemName", "")
+
+        if userId:
+            if not isinstance(userId, ObjectId):
+                userId = ObjectId(userId)
+
+        responseDB = dbInv.find_one({"user_id": userId})
+
+        if responseDB:
+            items = responseDB.get('items', [])
+            filtered_items = [item for item in items if item.get('item_name') == itemName]
+            return jsonify(filtered_items),200
+
+        return jsonify([])
+
+    return "Method not allowed", 405
+
+@app.route('/edititem', methods=["POST"])
+def edit_item():
+    if request.method == "POST":
+        data = request.json
+        itemName = data.get("itemName", "")
+        itemQty = data.get("itemQty", "")
+        itemPrice = data.get("itemPrice", "")
+        itemMin = data.get("itemMin", "")
+        itemMax = data.get("itemMax", "")
+        userId = data.get("userId", "")
+
+        if userId:
+            if not isinstance(userId, ObjectId):
+                userId = ObjectId(userId)
+
+        
+        result = dbInv.update_one(
+            {"user_id": userId, "items.item_name": itemName},
+            {"$set": {
+                "items.$.item_qty": itemQty,
+                "items.$.item_price": itemPrice,
+                "items.$.item_min": itemMin,
+                "items.$.item_max": itemMax
+            }}
+        )
+
+        if result.modified_count>=0:
+            return jsonify({"message": "Item updated successfully"}), 200
+
 
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0")

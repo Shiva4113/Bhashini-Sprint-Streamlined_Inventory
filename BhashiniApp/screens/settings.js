@@ -11,6 +11,7 @@ const Settings = () => {
   const doUserLogOut = async function () {
     try {
       await SecureStore.deleteItemAsync("userID");
+      await SecureStore.deleteItemAsync("language");
       navigation.navigate("Login");
     } catch (error) {
       console.error("Error logging out:", error.message);

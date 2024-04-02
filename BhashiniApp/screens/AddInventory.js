@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TextInput, Button, StyleSheet } from "react-native";
 import axios from "axios";
-
+import * as SecureStore from 'expo-secure-store'
 const AddInventory = ({ navigation }) => {
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -11,20 +11,42 @@ const AddInventory = ({ navigation }) => {
 
   const addItem = async () => {
     try {
-      // Assuming your backend endpoint for adding items is "/inventory"
-      await axios.post("http://192.168.68.104:5000/addinv", {
-        name: itemName,
-        quantity: parseInt(quantity),
-        price: parseFloat(price),
-        min_quantity: parseInt(minQuantity),
-        max_quantity: parseInt(maxQuantity)
+      let userID = await SecureStore.getItemAsync("userID").catch(error => {
+        console.error("Error retrieving userID:", error);
+        throw error; 
       });
-      // Navigate back to the Inventory screen after adding the item
-      navigation.goBack();
+  
+      // Check if any of the fields are empty
+      if (!itemName || !quantity || !price || !minQuantity || !maxQuantity) {
+        console.error("Error adding item: One or more fields are empty");
+        return;
+      }
+  
+      const response = await fetch("http://10.1.1.58:5000/addinv", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userID,
+          itemName: itemName,
+          itemQty: parseInt(quantity),
+          itemPrice: parseFloat(price),
+          itemMin: parseInt(minQuantity),
+          itemMax: parseInt(maxQuantity)
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      navigation.navigate('Inventory');
     } catch (error) {
       console.error("Error adding item:", error);
     }
   };
+  
+  
 
   return (
     <View style={styles.container}>
