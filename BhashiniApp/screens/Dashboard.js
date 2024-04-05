@@ -1,4 +1,5 @@
-import React, { useState,useEffect } from "react";
+
+import React, { useState,useEffect, useRef } from "react";
 import { StyleSheet, View, StatusBar, Platform, Text, Button, TouchableOpacity, Image, Pressable, Alert } from "react-native";
 import { Color, Border, FontFamily, FontSize } from "../GlobalStyles";
 import { Audio } from "expo-av";
@@ -18,47 +19,120 @@ const Dashboard = () => {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const navigation = useNavigation();
   const [sound,setSound] = useState(null);
+  const cameraRef = useRef(null);
+  const isMounted = useRef(true);
 
-  
-
-  const cameraRef = useCallback(ref => {
-    if (ref !== null) {
-      ref.resumePreview();
-    }
+  useEffect(() => {
+    return () => {
+      isMounted.current = false; // Set to false when the component unmounts
+    };
   }, []);
 
-  const toggleCamera = () => {
-    setIsCameraVisible(!isCameraVisible);
-  };
+  // const cameraRef = useCallback(ref => {
+  //   if (ref !== null) {
+  //     ref.resumePreview();
+  //   }
+  // }, []);
 
-  const takePicture = async () => {
-    console.log("buttonclicked");
+  const toggleCamera = () => {
     if (cameraRef.current) {
-      console.log(cameraRef.current);
-      try {
-        const { uri } = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: true });
-        console.log('Picture taken:', uri);
-  
-        // Generate a unique filename
-        const filename = `GeneratedImage_${Date.now()}.jpg`;
-  
-        // Create a directory for saving images if it doesn't exist
-        const directory = `${FileSystem.documentDirectory}images/`;
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-  
-        // Save the image to the directory
-        const savedImage = await FileSystem.moveAsync({
-          from: uri,
-          to: `${directory}${filename}`,
-        });
-  
-        console.log('Image saved:', savedImage);
-      } catch (error) {
-        console.error('Failed to take picture:', error);
-      }
-    } else {
-      console.log('Camera ref is not yet available');
+      cameraRef.current.pausePreview(); // Pause the preview before toggling visibility
     }
+    setIsCameraVisible(!isCameraVisible);
+ };
+
+ const takePicture = async () => {
+  console.log("Button Clicked")
+  if (cameraRef.current) {
+     try {
+       const { uri } = await cameraRef.current.takePictureAsync({ quality: 0.5, base64: true });
+       console.log('Picture taken:', uri);
+       // Generate a unique filename
+      //  const filename = `GeneratedImage_${Date.now()}.jpg`;
+      //  console.log('Filename:',filename)
+      //  // Create a directory for saving images if it doesn't exist
+      //  const directory = `${FileSystem.documentDirectory}images/`;
+      //  console.log('Directory:',directory)//temp
+      //  const hasFileBeenMoved = await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+      //  console.log('Has directory been made?:',hasFileBeenMoved)
+      //  const info = await FileSystem.getInfoAsync(directory)
+      //  console.log('Info of path:',info)
+ 
+       // Save the image to the directory
+      //  const toDirectory = `${directory}${filename}`
+      //  console.log('Path to be moved to:',toDirectory)
+      //  const savedImage = await FileSystem.moveAsync({
+      //    from: uri,
+      //    to: `${directory}${filename}`,
+      //  });
+
+      //  console.log('Image saved:', savedImage);
+      //  console.log('Saved Image URI:',savedImage.uri)
+ 
+       // Read the image file as binary data
+      //  const imageData = await FileSystem.readAsStringAsync(savedImage.uri, { encoding: FileSystem.EncodingType.Base64 });
+      //const imageData = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+ 
+       // Convert base64 to byte stream
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      console.log(base64)
+      
+      cameraRef.current.pausePreview(); // Pause the camera preview
+      setIsCameraVisible(false); // Hide the camera view
+      navigation.navigate('Dashboard'); // Navigate back to the dashboard
+ 
+       // Send byte stream to backend
+      sendImageToBackend(base64); 
+ 
+     } catch (error) {
+       console.error('Failed to take picture:', error);
+       Alert.alert('Error', 'Failed to take picture: ' + (error.message || error));
+     }
+  }
+ };
+
+ const sendImageToBackend = async (byteStream) => {
+  try {
+    let userID = await SecureStore.getItemAsync("userID").catch(error => {
+        console.error("Error retrieving userID:", error);
+        throw error;
+    });
+    let srcLang = await SecureStore.getItemAsync("language").catch(error => {
+      console.error("Error retrieving userID:", error);
+      throw error; 
+  });
+  let tgtLang = "en" // defaulting this to english cuz gemini works on english
+    const response = await fetch(`http://${process.env.IP_ADDR}:5000/processimage`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            sourceLanguage: srcLang,
+            targetLanguage: tgtLang,
+            imageUri: byteStream,
+            userId: userID
+        })
+    }).catch(error => {
+        console.error("Error sending audio to backend:", error);
+        throw error; // Rethrow the error to be caught by the outer try-catch
+    });
+
+    // Assuming you want to do something with the response, like checking the status
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    // Process the response as needed
+    // For example, if you expect JSON in the response:
+    const data = await response.json();
+    console.log(data);
+    playAudio(data.response)
+    stopAudio()
+} catch (error) {
+    console.error("An error occurred:", error);
+    // Handle the error as appropriate for your application
+}
   };
   
   
@@ -147,7 +221,7 @@ const Dashboard = () => {
           throw error; 
       });
       let tgtLang = "en" // defaulting this to english cuz gemini works on english
-        const response = await fetch('http://10.1.1.58:5000/processaudio', {
+        const response = await fetch(`http://${process.env.IP_ADDR}:5000/processaudio`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -307,12 +381,15 @@ const Dashboard = () => {
       
       
       {isCameraVisible && (
-        <Camera style={StyleSheet.absoluteFill} type={Camera.Constants.Type.back} ref={cameraRef}>
-
+        <Camera style={StyleSheet.absoluteFill} 
+                type={Camera.Constants.Type.back} 
+                ref={(camera) => {
+                  cameraRef.current = camera;
+               }}>
           <View style={styles.captureButton}>
             <Button title="Capture" onPress={takePicture} color='grey' />
           </View>
-        </Camera>
+      </Camera>
       )}
     </View>
   );
@@ -529,3 +606,4 @@ const styles = StyleSheet.create({
 });
 
 export default Dashboard;
+

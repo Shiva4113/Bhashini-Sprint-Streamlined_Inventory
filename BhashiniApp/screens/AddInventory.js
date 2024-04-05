@@ -22,7 +22,7 @@ const AddInventory = ({ navigation }) => {
         return;
       }
   
-      const response = await fetch("http://10.1.1.58:5000/addinv", {
+      const response = await fetch(`http://${process.env.IP_ADDR}:5000/addinv`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

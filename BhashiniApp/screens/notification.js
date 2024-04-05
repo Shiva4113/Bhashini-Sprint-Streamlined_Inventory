@@ -12,7 +12,7 @@ const NotificationsPage = () => {
   const fetchLowInventoryItems = async () => {
     try {
       // Fetch inventory items from the backend
-      const response = await axios.get("http://10.1.1.58:5000/notif");
+      const response = await axios.get(`http://${process.env.IP_ADDR}:5000/notif`);
       const inventoryItems = response.data;
 
       // Filter items based on quantity less than min_quantity

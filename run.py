@@ -106,8 +106,6 @@ dbConnect()
 #FLASK
 app = Flask(__name__)
 CORS(app)
-# @app.route('/')#https://localhost:5000
-# def home():
    
 
 #HANDLE DB with LLM - GEMINI
@@ -128,9 +126,13 @@ def process_instr(instruction, userId):
                 sold 3 bananas and 2 onions : REMOVE;[3,2];[Banana, Onion]
                 2 Apples were sold: REMOVE;[2];[Apple]
 	            3 Mangos received : INSERT;[3];[Mango] 
-	            4 Potato Chips obtained : INSERT;[4];[Potato Chips]
+	            4 Packets of Potato Chips obtained : INSERT;[4];[Packet Potato Chips]
                 I got one hundred carrots: INSERT;[100];[Carrot] 
-                I gave 3 carrots: REMOVE;[3];[CARROT]
+                I gave 3 carrots: REMOVE;[3];[Carrot]
+                I sent 1 Mango : REMOVE;[1];[Mango]
+                I have picked out 10 Items: REMOVE;[10][Item]
+                
+    
     examples:
 	What is the price of Banana? : STATUS;PRICE;[Banana]
 	How many apples are left? : STATUS;QUANTITY;[Apple]
@@ -139,7 +141,8 @@ def process_instr(instruction, userId):
     How many Mangoes do I have? : STATUS;QUANTITY;[Mango]
     How many 
     Strictly follow the output format of STATUS;PRICE/QUANTITY/[ItemName] or INSERT/REMOVE;[QUANTITY];[ItemNames]
-    Keep the item quantities in one list and the itemNames in another list, dont separate them''')
+    Keep the item quantities in one list and the itemNames in another list, dont separate them.
+    RETURN A <whitespace>;[];[] for any other miscellaneous instruction and dont hallucinate.''')
     
     
     cmdContent = responseGen.text.upper().split(';')
@@ -508,7 +511,9 @@ def process_image_request():
         credentials = request.json
         userId = credentials.get("userId", "")
         img = credentials.get("imageUri","")
-        
+        # srcLang = credentials.get("sourceLanguage")
+        # tgtLang = credentials.get("targetLanguage")
+        # print(img)
         if not isinstance(userId, ObjectId):
             userId = ObjectId(userId)
         cmdContent = process_img(img)
@@ -529,7 +534,7 @@ def process_image_request():
                                     {"_id": responseDB['_id'], "items.item_name": itemName},
                                     {"$inc": {"items.$.item_qty": -itemQty}}
                                 )
-                                if item['item_qty']-itemQty <= item['item_min']:
+                                if int(item['item_qty'])-int(itemQty) <= int(item['item_min']):
                                     replyToUser+= f"Sold {itemQty} {itemName} . Less {itemName} available."
                                 else:
                                     replyToUser += f"Sold {itemQty} {itemName} ."
@@ -609,8 +614,8 @@ def process_image_request():
         # return responseLLM
             
         responseNmtTts = process_nmt_tts(textContent = reply["response"],srcLang=tgtLang,tgtLang=srcLang,ttsServiceId=ttsServiceId,nmtServiceId=nmtServiceId)
-
-        return responseNmtTts
+        outputAudio = responseNmtTts["pipelineResponse"][1]["audio"][0]["audioContent"]
+        return jsonify({"response":outputAudio}),200
 
 #HANDLE LOGIN/SIGNUP
 @app.route('/signup',methods=["POST"])
@@ -642,7 +647,6 @@ def signup():
     return jsonify({"message": "User created successfully"}), 201
 
 
-
 @app.route('/login',methods=["POST"])
 def login():
     if request.method == "POST":
@@ -671,6 +675,7 @@ def login():
     #can globally set the db to its documents
     
 
+
 #HANDLE USER AUTH CHANGES
 @app.route('/changepassword',methods=["POST"])
 def change_password():
@@ -696,7 +701,6 @@ def change_password():
         else:
             return jsonify({"error": "User not found"}), 404
         
-
 @app.route('/changelanguage',methods=["POST"])
 def change_language():
     if request.method == "POST":
@@ -710,9 +714,11 @@ def change_language():
         user = dbUserAuth.find_one({"_id": user_id})
         if user:
             dbUserAuth.update_one({"_id": user_id}, {"$set": {"language": language}})
-            return jsonify({"message": "Language changed successfully"}), 200
+            return jsonify({"response": "Language changed successfully"}), 200
         else:
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"response": "User not found"}), 404
+
+
 
 #INVENTORY UPDATES        
 @app.route('/fetchinv',methods = ["POST"])
@@ -733,7 +739,6 @@ def get_inventory():
         responseItems =  {"items":items}
 
         return responseItems
-    
     
 @app.route('/updateinv', methods= ["POST"])
 def update_inventory():
@@ -760,7 +765,6 @@ def update_inventory():
             response = {"message": "No document found with the provided userId or items not updated"}
         
     return response
-
 
 @app.route('/profile',methods= ['POST'])
 def get_profile():
@@ -806,7 +810,6 @@ def process_add_inv():
     )
 
     return jsonify({"response": "Successfully added item!"}), 200
-
 
 @app.route('/fetchitem', methods=['POST'])
 def fetch_item():
@@ -860,7 +863,6 @@ def edit_item():
             return jsonify({"message": "Item updated successfully","userId":str(userId),"itemName":itemName,"itemPrice":itemPrice,"itemMax":itemMax,"itemMin":itemMin,"itemQty":itemQty}), 200
         else:
             return jsonify({"message":"No changes made","itemName":itemName,"itemPrice":itemPrice,"itemMax":itemMax,"itemMin":itemMin,"itemQty":itemQty})
-
-
+        
 if __name__ == "__main__":
     app.run(debug=True,host="0.0.0.0")

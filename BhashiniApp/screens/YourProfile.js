@@ -15,7 +15,7 @@ const YourProfile = () => {
         let userID = await SecureStore.getItemAsync("userID");
         console.log("uid:", userID);
     
-        const response = await fetch("http://10.1.1.58:5000/profile", {
+        const response = await fetch(`http://${process.env.IP_ADDR}:5000/profile`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

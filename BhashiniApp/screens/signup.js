@@ -33,7 +33,7 @@ export default function Signup() {
         language: language,
       };
       const response = await fetch(
-        `http://10.1.1.58:5000/signup`,
+        `http://${process.env.IP_ADDR}:5000/signup`,
         {
           method: "POST",
           headers: {
