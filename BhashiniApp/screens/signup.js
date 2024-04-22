@@ -32,6 +32,7 @@ export default function Signup() {
         mobile_no: phoneNumber,
         language: language,
       };
+      console.log(process.env.IP_ADDR)
       const response = await fetch(
         `http://${process.env.IP_ADDR}:5000/signup`,
         {

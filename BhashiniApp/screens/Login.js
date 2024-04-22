@@ -27,7 +27,7 @@ export default function Login() {
         username: username,
         password: password,
       };
-
+      console.log(process.env.IP_ADDR)
       const response = await fetch(`http://${process.env.IP_ADDR}:5000/login`, {
         method: "POST",
         headers: {
